@@ -109,68 +109,42 @@ struct TodayView: View {
     // MARK: pics
 
     private var picsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Pics")
-            HStack(alignment: .top, spacing: 16) {
+            HStack(spacing: 12) {
                 if let pics = log?.pics, !pics.isEmpty {
-                    ForEach(Array(pics.enumerated()), id: \.element.id) { index, pic in
-                        polaroid(pose: pic.pose, tilt: index.isMultiple(of: 2) ? -2.5 : 2)
+                    ForEach(pics) { pic in
+                        picThumb(pose: pic.pose)
                     }
                 }
                 Button {
                     // camera flow lands with the vault store
                 } label: {
-                    polaroidFrame(tilt: (log?.pics.isEmpty ?? true) ? -1.5 : 1.5) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Palette.chalk)
-                            .overlay {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Palette.madder)
-                            }
-                    } caption: {
-                        Text("new")
-                    }
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Palette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .frame(width: 64, height: 84)
+                        .overlay {
+                            Image(systemName: "plus")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Palette.madder)
+                        }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Take progress photo")
             }
-            .padding(.vertical, 6)
         }
     }
 
-    private func polaroid(pose: PicPose, tilt: Double) -> some View {
-        polaroidFrame(tilt: tilt) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(
-                    LinearGradient(
-                        colors: [Palette.chalk, Palette.graphite.opacity(0.25)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-        } caption: {
-            Text(pose.rawValue)
-        }
-    }
-
-    /// White polaroid frame: photo window + handwritten caption strip.
-    private func polaroidFrame(
-        tilt: Double,
-        @ViewBuilder photo: () -> some View,
-        @ViewBuilder caption: () -> some View
-    ) -> some View {
-        VStack(spacing: 5) {
-            photo()
-                .frame(width: 74, height: 88)
-            caption()
-                .font(Typo.handwriting)
-                .foregroundStyle(Palette.graphite)
-                .frame(height: 14)
-        }
-        .padding(6)
-        .background(Palette.polaroid, in: RoundedRectangle(cornerRadius: 3))
-        .shadow(color: Palette.ink.opacity(0.12), radius: 7, y: 3)
-        .rotationEffect(.degrees(tilt))
+    private func picThumb(pose: PicPose) -> some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Palette.chalk)
+            .frame(width: 64, height: 84)
+            .overlay(alignment: .bottom) {
+                Text(pose.rawValue)
+                    .font(Typo.monoSmall)
+                    .foregroundStyle(Palette.graphite)
+                    .padding(.bottom, 6)
+            }
     }
 
     // MARK: shared bits

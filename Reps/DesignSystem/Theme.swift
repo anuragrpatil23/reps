@@ -15,7 +15,6 @@ enum Palette {
     // Card stocks (v2): each domain gets its own quiet paper color.
     static let sage   = Color(red: 227 / 255, green: 234 / 255, blue: 224 / 255) // #E3EAE0 — activity
     static let butter = Color(red: 245 / 255, green: 237 / 255, blue: 218 / 255) // #F5EDDA — food
-    static let polaroid = Color.white                                            // pics
 }
 
 /// A section card cut from its own paper stock.
@@ -50,6 +49,4 @@ enum Typo {
     /// Body/UI.
     static let body = Font.system(size: 16, weight: .regular)
     static let label = Font.system(size: 14, weight: .medium)
-    /// Polaroid captions only — the one playful voice.
-    static let handwriting = Font.custom("Noteworthy-Light", size: 12)
 }
