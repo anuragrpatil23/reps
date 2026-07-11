@@ -11,16 +11,19 @@ struct TodayView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 20) {
                     masthead
                     weightBlock
+                        .padding(.bottom, 4)
                     if let activity = log?.activity {
                         ActivityLineView(activity: activity)
+                            .cardStock(Palette.sage)
                     }
                     if let workout = log?.workout {
                         WorkoutCardView(workout: workout)
                     }
                     foodSection
+                        .cardStock(Palette.butter)
                     picsSection
                 }
                 .padding(.horizontal, 24)
@@ -80,7 +83,7 @@ struct TodayView: View {
         VStack(alignment: .leading, spacing: 0) {
             sectionHeader("Food")
             if let food = log?.food, !food.isEmpty {
-                ForEach(food) { entry in
+                ForEach(Array(food.enumerated()), id: \.element.id) { index, entry in
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         Text(entry.at)
                             .font(Typo.mono)
@@ -92,7 +95,9 @@ struct TodayView: View {
                     }
                     .padding(.vertical, 9)
                     .overlay(alignment: .bottom) {
-                        Rectangle().fill(Palette.hairline).frame(height: 0.5)
+                        if index < food.count - 1 {
+                            Rectangle().fill(Palette.hairline).frame(height: 0.5)
+                        }
                     }
                 }
             } else {
@@ -104,42 +109,68 @@ struct TodayView: View {
     // MARK: pics
 
     private var picsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             sectionHeader("Pics")
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 16) {
                 if let pics = log?.pics, !pics.isEmpty {
-                    ForEach(pics) { pic in
-                        picThumb(pose: pic.pose)
+                    ForEach(Array(pics.enumerated()), id: \.element.id) { index, pic in
+                        polaroid(pose: pic.pose, tilt: index.isMultiple(of: 2) ? -2.5 : 2)
                     }
                 }
                 Button {
                     // camera flow lands with the vault store
                 } label: {
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Palette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .frame(width: 64, height: 84)
-                        .overlay {
-                            Image(systemName: "plus")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Palette.madder)
-                        }
+                    polaroidFrame(tilt: (log?.pics.isEmpty ?? true) ? -1.5 : 1.5) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Palette.chalk)
+                            .overlay {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(Palette.madder)
+                            }
+                    } caption: {
+                        Text("new")
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Take progress photo")
             }
+            .padding(.vertical, 6)
         }
     }
 
-    private func picThumb(pose: PicPose) -> some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Palette.chalk)
-            .frame(width: 64, height: 84)
-            .overlay(alignment: .bottom) {
-                Text(pose.rawValue)
-                    .font(Typo.monoSmall)
-                    .foregroundStyle(Palette.graphite)
-                    .padding(.bottom, 6)
-            }
+    private func polaroid(pose: PicPose, tilt: Double) -> some View {
+        polaroidFrame(tilt: tilt) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(
+                    LinearGradient(
+                        colors: [Palette.chalk, Palette.graphite.opacity(0.25)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+        } caption: {
+            Text(pose.rawValue)
+        }
+    }
+
+    /// White polaroid frame: photo window + handwritten caption strip.
+    private func polaroidFrame(
+        tilt: Double,
+        @ViewBuilder photo: () -> some View,
+        @ViewBuilder caption: () -> some View
+    ) -> some View {
+        VStack(spacing: 5) {
+            photo()
+                .frame(width: 74, height: 88)
+            caption()
+                .font(Typo.handwriting)
+                .foregroundStyle(Palette.graphite)
+                .frame(height: 14)
+        }
+        .padding(6)
+        .background(Palette.polaroid, in: RoundedRectangle(cornerRadius: 3))
+        .shadow(color: Palette.ink.opacity(0.12), radius: 7, y: 3)
+        .rotationEffect(.degrees(tilt))
     }
 
     // MARK: shared bits

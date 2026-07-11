@@ -52,6 +52,10 @@ enum MockData {
                     FoodEntry(at: "13:00", text: "chicken + veggies + sourdough"),
                     FoodEntry(at: "19:30", text: "protein shake, cashews"),
                 ]
+                log.pics = [
+                    ProgressPic(path: "sffit/progress-pics/mock-front.jpg", pose: .front),
+                    ProgressPic(path: "sffit/progress-pics/mock-side.jpg", pose: .side),
+                ]
             case "l":
                 log.metrics = BodyMetrics(weightLbs: 138.4 + Double(offset) * 0.045)
                 log.activity = ActivitySummary(moveKcal: 380, exerciseMin: 18, standHours: 9, steps: 6120)

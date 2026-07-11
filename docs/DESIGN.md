@@ -1,4 +1,16 @@
-# Reps Design Direction — "The Ledger"
+# Reps Design Direction — "The Ledger" (v2: Card Stock)
+
+> **v2 revision (2026-07-11):** v1 read too austere. The metaphor warms up from
+> *accountant's ledger* to *stationery-shop journal*: the day is a stack of
+> beautiful index cards in different paper stocks. Each domain gets its own
+> muted card tint (sage for activity, chalk for training, butter for food),
+> progress pics become polaroids with slight rotation and a handwritten
+> caption (Noteworthy), and cards sit on soft ink shadows. Type discipline,
+> the madder rule, and the Spine are unchanged — fun comes from paper color
+> and the polaroids, elegance stays in the type.
+>
+> Added tokens: `sage #E3EAE0`, `butter #F5EDDA`, `polaroid #FFFFFF`,
+> card shadow = ink 6% / radius 12 / y 4, corner radius 20.
 
 Reps is a **training journal, not a fitness dashboard**. The design thesis comes straight from the journey map: three years of effort failed for lack of *consistent daily record-keeping*, not lack of intensity. So the app should feel like a beautiful ledger you're proud to keep — calm, ink-on-paper, data-quiet — and pointedly unlike the black-and-neon, streak-shaming genre.
 

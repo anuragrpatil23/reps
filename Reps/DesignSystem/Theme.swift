@@ -11,6 +11,30 @@ enum Palette {
 
     /// Hairline rules and quiet strokes.
     static let hairline = graphite.opacity(0.35)
+
+    // Card stocks (v2): each domain gets its own quiet paper color.
+    static let sage   = Color(red: 227 / 255, green: 234 / 255, blue: 224 / 255) // #E3EAE0 — activity
+    static let butter = Color(red: 245 / 255, green: 237 / 255, blue: 218 / 255) // #F5EDDA — food
+    static let polaroid = Color.white                                            // pics
+}
+
+/// A section card cut from its own paper stock.
+struct CardStock: ViewModifier {
+    let stock: Color
+
+    func body(content: Content) -> some View {
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(stock, in: RoundedRectangle(cornerRadius: 20))
+            .shadow(color: Palette.ink.opacity(0.06), radius: 12, y: 4)
+    }
+}
+
+extension View {
+    func cardStock(_ stock: Color) -> some View {
+        modifier(CardStock(stock: stock))
+    }
 }
 
 enum Typo {
@@ -26,4 +50,6 @@ enum Typo {
     /// Body/UI.
     static let body = Font.system(size: 16, weight: .regular)
     static let label = Font.system(size: 14, weight: .medium)
+    /// Polaroid captions only — the one playful voice.
+    static let handwriting = Font.custom("Noteworthy-Light", size: 12)
 }

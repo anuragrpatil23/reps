@@ -50,7 +50,6 @@ struct WorkoutCardView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(18)
-        .background(Palette.chalk, in: RoundedRectangle(cornerRadius: 14))
+        .cardStock(Palette.chalk)
     }
 }
