@@ -1,0 +1,34 @@
+name: Reps
+options:
+  bundleIdPrefix: com.anurag
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+targets:
+  Reps:
+    type: application
+    platform: iOS
+    sources:
+      - Reps
+    entitlements:
+      path: Reps/Reps.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+    info:
+      path: Reps/Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: Reps
+        NSHealthShareUsageDescription: Reps reads your weight, body composition, and activity from Apple Health to fill in your daily log.
+        NSCameraUsageDescription: Reps uses the camera to take progress photos.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.anurag.reps
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
