@@ -98,8 +98,10 @@ struct FoodEntry: Codable, Identifiable, Sendable {
     var text: String?
     var recipe: String?
     var photo: String?
+    var foodId: String?       // reference into the food DB (foods.csv)
+    var servings: Double?     // multiplier on the food's per-serving macros
 
-    var id: String { at + (text ?? recipe ?? photo ?? "") }
+    var id: String { at + (foodId ?? text ?? recipe ?? photo ?? "") }
 }
 
 enum PicPose: String, Codable, Sendable {

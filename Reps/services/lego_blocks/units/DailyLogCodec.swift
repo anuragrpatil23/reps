@@ -55,6 +55,8 @@ enum DailyLogCodec {
                 if let v = entry.text { d["text"] = v }
                 if let v = entry.recipe { d["recipe"] = v }
                 if let v = entry.photo { d["photo"] = v }
+                if let v = entry.foodId { d["food_id"] = v }
+                if let v = entry.servings { d["servings"] = v }
                 return d
             }
         }
@@ -118,7 +120,8 @@ enum DailyLogCodec {
             log.food = food.compactMap { d in
                 guard let at = d["at"] as? String else { return nil }
                 return FoodEntry(at: at, text: d["text"] as? String,
-                                 recipe: d["recipe"] as? String, photo: d["photo"] as? String)
+                                 recipe: d["recipe"] as? String, photo: d["photo"] as? String,
+                                 foodId: d["food_id"] as? String, servings: asDouble(d["servings"]))
             }
         }
         if let pics = fm["pics"] as? [[String: Any]] {

@@ -82,7 +82,7 @@ struct TodayView: View {
             }
         }
         .sheet(isPresented: $showingFoodSheet) {
-            FoodEntrySheet { entry in
+            FoodPickerSheet { entry in
                 store.addFood(entry, on: selectedDay)
             }
         }
@@ -242,10 +242,15 @@ struct TodayView: View {
                         Text(entry.at)
                             .font(Typo.mono)
                             .foregroundStyle(Palette.graphite)
-                        Text(entry.text ?? entry.recipe ?? "photo")
+                        Text(foodLabel(entry))
                             .font(Typo.body)
                             .foregroundStyle(Palette.ink)
                         Spacer(minLength: 0)
+                        if let m = store.macros(for: entry) {
+                            Text("\(Int(m.calories.rounded()))")
+                                .font(Typo.mono)
+                                .foregroundStyle(Palette.graphite)
+                        }
                     }
                     .padding(.vertical, 9)
                     .overlay(alignment: .bottom) {
@@ -254,9 +259,35 @@ struct TodayView: View {
                         }
                     }
                 }
+                macroTotals
             } else {
                 emptyLine("Nothing logged yet.")
             }
+        }
+    }
+
+    /// "Kimchi Rice ×2" for DB foods, else the free text.
+    private func foodLabel(_ entry: FoodEntry) -> String {
+        if entry.foodId != nil {
+            let servings = entry.servings ?? 1
+            let suffix = servings == 1 ? "" : " ×\(servings.formatted(.number.precision(.fractionLength(0...2))))"
+            return (entry.text ?? "food") + suffix
+        }
+        return entry.text ?? entry.recipe ?? "photo"
+    }
+
+    @ViewBuilder
+    private var macroTotals: some View {
+        let total = store.macros(for: selectedDay)
+        if !total.isEmpty {
+            HStack(spacing: 6) {
+                Text("\(Int(total.calories.rounded())) kcal")
+                    .foregroundStyle(Palette.ink)
+                Text("· \(Int(total.proteinG.rounded()))P · \(Int(total.carbsG.rounded()))C · \(Int(total.fatG.rounded()))F")
+                    .foregroundStyle(Palette.graphite)
+            }
+            .font(Typo.mono)
+            .padding(.top, 10)
         }
     }
 

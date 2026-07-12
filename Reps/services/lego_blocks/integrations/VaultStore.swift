@@ -217,4 +217,15 @@ final class VaultStore {
     func writeWorkouts(_ workouts: [WorkoutRecord]) throws {
         try writeText(HealthCsv.formatWorkouts(workouts), to: HealthCsv.workoutsPath)
     }
+
+    // MARK: - Food database
+
+    func readFoods() -> [Food] {
+        guard let text = readText(FoodsCsv.path) else { return [] }
+        return FoodsCsv.parse(text)
+    }
+
+    func writeFoods(_ foods: [Food]) throws {
+        try writeText(FoodsCsv.format(foods), to: FoodsCsv.path)
+    }
 }

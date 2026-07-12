@@ -11,8 +11,11 @@ final class LogStore {
 
     private(set) var logsByDay: [Date: DailyLog] = [:]
     private(set) var templates: [WorkoutTemplate] = []
+    private(set) var foods: [Food] = []
     private(set) var loaded = false
     var lastError: String?
+
+    private var foodsById: [String: Food] { Dictionary(foods.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) }
 
     // Telemetry lives in CSVs, not the daily markdown. These are the in-memory
     // mirrors we flush whole-file on change; logsByDay is the joined view.
@@ -61,7 +64,57 @@ final class LogStore {
 
         let fromVault = vault.readTemplates()
         templates = fromVault.isEmpty ? [.builtinPushA] : fromVault
+        foods = vault.readFoods()
         loaded = true
+    }
+
+    // MARK: - Food database
+
+    func food(_ id: String) -> Food? { foodsById[id] }
+
+    func saveFood(_ food: Food) {
+        var updated = food
+        updated.updatedAt = Date()
+        if let index = foods.firstIndex(where: { $0.id == updated.id }) {
+            foods[index] = updated
+        } else {
+            foods.append(updated)
+        }
+        flushFoods()
+    }
+
+    func deleteFood(_ id: String) {
+        foods.removeAll { $0.id == id }
+        flushFoods()
+    }
+
+    private func flushFoods() {
+        do { try vault.writeFoods(foods) }
+        catch { lastError = "Couldn't save food: \(error.localizedDescription)" }
+    }
+
+    /// A unique slug id for a new food name (suffixes on collision).
+    func uniqueFoodId(for name: String) -> String {
+        let base = Food.slug(for: name)
+        guard foodsById[base] != nil else { return base }
+        var n = 2
+        while foodsById["\(base)-\(n)"] != nil { n += 1 }
+        return "\(base)-\(n)"
+    }
+
+    // MARK: - Macros
+
+    /// Macros for a single logged entry (food × servings), if it references one.
+    func macros(for entry: FoodEntry) -> Macros? {
+        guard let id = entry.foodId, let food = foodsById[id] else { return nil }
+        return food.macros.scaled(by: entry.servings ?? 1)
+    }
+
+    /// Total macros logged on a day.
+    func macros(for date: Date) -> Macros {
+        (log(for: date)?.food ?? []).reduce(Macros()) { total, entry in
+            total + (macros(for: entry) ?? Macros())
+        }
     }
 
     func connectVault(to url: URL) {
