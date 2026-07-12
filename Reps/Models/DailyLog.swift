@@ -17,11 +17,25 @@ struct DailyLog: Identifiable, Codable, Sendable {
     var id: Date { date }
 }
 
-struct BodyMetrics: Codable, Sendable {
+struct BodyMetrics: Codable, Sendable, Equatable {
     var weightLbs: Double
+    var bmi: Double?
     var bodyFatPct: Double?
     var leanMassLbs: Double?
     var measuredAt: Date?
+
+    /// A one-line composition summary for the day the scale ran, e.g.
+    /// "24.1% fat · 99.7 lean". Nil when no composition data came through.
+    var compositionLine: String? {
+        var parts: [String] = []
+        if let bodyFatPct { parts.append("\(trim(bodyFatPct))% fat") }
+        if let leanMassLbs { parts.append("\(trim(leanMassLbs)) lean") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func trim(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+    }
 }
 
 struct ActivitySummary: Codable, Sendable {

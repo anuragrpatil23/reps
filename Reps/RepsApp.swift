@@ -6,7 +6,7 @@ struct RepsApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TodayView()
+            RootView()
                 .environment(store)
         }
     }

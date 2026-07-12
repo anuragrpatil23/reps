@@ -39,6 +39,7 @@ enum DailyLogCodec {
         ]
         if let m = log.metrics {
             var d: [String: Any] = ["weight_lbs": m.weightLbs]
+            if let v = m.bmi { d["bmi"] = v }
             if let v = m.bodyFatPct { d["body_fat_pct"] = v }
             if let v = m.leanMassLbs { d["lean_mass_lbs"] = v }
             if let v = m.measuredAt { d["measured_at"] = isoFormatter.string(from: v) }
@@ -99,6 +100,7 @@ enum DailyLogCodec {
         if let m = fm["metrics"] as? [String: Any], let weight = asDouble(m["weight_lbs"]) {
             log.metrics = BodyMetrics(
                 weightLbs: weight,
+                bmi: asDouble(m["bmi"]),
                 bodyFatPct: asDouble(m["body_fat_pct"]),
                 leanMassLbs: asDouble(m["lean_mass_lbs"]),
                 measuredAt: (m["measured_at"] as? String).flatMap(isoFormatter.date)

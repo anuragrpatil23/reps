@@ -25,12 +25,14 @@ struct SettingsSheet: View {
                     }
                     .foregroundStyle(Palette.madder)
                 }
-                Section("Apple Health") {
+                Section {
                     Button("Connect Apple Health") {
                         Task {
                             do {
                                 try await HealthKitService.requestAuthorization()
-                                healthStatus = "Connected — weight, body comp, and activity will fill in automatically."
+                                healthStatus = "Syncing…"
+                                await store.syncHealth(around: Date())
+                                healthStatus = "Synced. Weigh-ins from FitDays and Activity now fill in automatically."
                             } catch {
                                 healthStatus = "Health access failed: \(error.localizedDescription)"
                             }
@@ -42,6 +44,24 @@ struct SettingsSheet: View {
                             .font(.footnote)
                             .foregroundStyle(Palette.graphite)
                     }
+                    #if DEBUG
+                    Button("Seed sample weigh-ins (debug)") {
+                        Task {
+                            do {
+                                try await HealthKitService.seedSampleWeighIns()
+                                await store.syncHealth(around: Date())
+                                healthStatus = "Seeded sample weigh-ins and synced."
+                            } catch {
+                                healthStatus = "Seed failed: \(error.localizedDescription)"
+                            }
+                        }
+                    }
+                    .foregroundStyle(Palette.graphite)
+                    #endif
+                } header: {
+                    Text("Apple Health")
+                } footer: {
+                    Text("FitDays writes your weight and body composition into Apple Health; Reps reads it from there. Set FitDays → Settings → System Permission to share with Health.")
                 }
                 Section {
                     Button("Rescan vault") { store.load() }

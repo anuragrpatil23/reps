@@ -42,7 +42,7 @@ struct TodayView: View {
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .refreshable { await store.refreshHealth(for: selectedDay) }
+            .refreshable { await store.syncHealth(around: selectedDay) }
             SpineView(
                 days: spineDays,
                 marks: spineDays.map { DayMark(log: store.log(for: $0)) },
@@ -55,10 +55,7 @@ struct TodayView: View {
         .animation(.easeOut(duration: 0.18), value: selectedDay)
         .task {
             if !store.loaded { store.load() }
-            await store.refreshHealth(for: selectedDay)
-        }
-        .onChange(of: selectedDay) {
-            Task { await store.refreshHealth(for: selectedDay) }
+            await store.syncHealth(around: selectedDay)
         }
         .sheet(isPresented: $showingWorkoutSheet) {
             WorkoutEditSheet(draft: log?.workout ?? store.stickyWorkout(for: selectedDay)) { final in
@@ -134,12 +131,16 @@ struct TodayView: View {
 
     @ViewBuilder
     private var weightBlock: some View {
-        if let weight = log?.metrics?.weightLbs {
+        // Prefer a weigh-in measured on the selected day; otherwise carry the
+        // most recent one forward with an "as of" note (the scale is sparse).
+        let measuredToday = log?.metrics
+        let carried = measuredToday == nil ? store.recentMetrics(asOf: selectedDay) : nil
+        if let metrics = measuredToday ?? carried?.metrics {
             VStack(alignment: .leading, spacing: 2) {
-                Text(weight.formatted(.number.precision(.fractionLength(1))))
+                Text(metrics.weightLbs.formatted(.number.precision(.fractionLength(1))))
                     .font(Typo.numeral)
                     .foregroundStyle(Palette.ink)
-                    .contentTransition(.numericText(value: weight))
+                    .contentTransition(.numericText(value: metrics.weightLbs))
                 HStack(spacing: 10) {
                     Text("lbs")
                         .font(Typo.mono)
@@ -150,9 +151,20 @@ struct TodayView: View {
                             .foregroundStyle(Palette.graphite)
                     }
                 }
+                if let composition = metrics.compositionLine {
+                    Text(composition)
+                        .font(Typo.monoSmall)
+                        .foregroundStyle(Palette.graphite)
+                        .padding(.top, 1)
+                }
+                if let carried, let day = carried.day as Date? {
+                    Text("as of \(day.formatted(.dateTime.month(.abbreviated).day()))")
+                        .font(Typo.monoSmall)
+                        .foregroundStyle(Palette.graphite.opacity(0.7))
+                }
             }
         } else {
-            Text("No weigh-in")
+            Text("No weigh-in yet")
                 .font(Typo.display)
                 .foregroundStyle(Palette.graphite)
         }

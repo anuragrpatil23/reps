@@ -46,9 +46,10 @@ created_at: 2026-07-11T07:42:00-05:00
 updated_at: 2026-07-11T21:10:00-05:00
 
 # ── Body metrics (from HealthKit; FitDays scale syncs into Apple Health) ──
-metrics:
+metrics:                      # from HealthKit; FitDays scale syncs these in
   weight_lbs: 138.2
-  body_fat_pct: 24.1          # omit keys with no sample that day
+  bmi: 19.5                    # omit keys with no sample that day
+  body_fat_pct: 24.1
   lean_mass_lbs: 99.7
   measured_at: 2026-07-11T07:30:00-05:00
 
