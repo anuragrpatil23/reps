@@ -45,28 +45,23 @@ struct CompositionChartCard: View {
     }
 
     private var chart: some View {
+        // Plot against an even index (not the irregular weigh-in date) so bars
+        // are evenly spaced; the x-axis still shows real dates at a few marks.
         Chart {
-            ForEach(points) { p in
+            ForEach(Array(points.enumerated()), id: \.element.id) { index, p in
                 BarMark(
-                    x: .value("Date", p.date),
+                    x: .value("n", Double(index)),
                     y: .value("lbs", p.leanLbs),
-                    width: .fixed(14)
+                    width: .ratio(0.62)
                 )
                 .foregroundStyle(by: .value("Part", "Fat-free"))
 
                 BarMark(
-                    x: .value("Date", p.date),
+                    x: .value("n", Double(index)),
                     y: .value("lbs", p.fatLbs),
-                    width: .fixed(14)
+                    width: .ratio(0.62)
                 )
                 .foregroundStyle(by: .value("Part", "Fat"))
-                .annotation(position: .top, spacing: 2) {
-                    if points.count <= 12 {
-                        Text("\(Int(p.bodyFatPct.rounded()))")
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Palette.graphite)
-                    }
-                }
             }
         }
         .chartForegroundStyleScale([
@@ -74,11 +69,19 @@ struct CompositionChartCard: View {
             "Fat": Palette.madder,
         ])
         .chartLegend(.hidden)
+        .chartXScale(domain: -0.6 ... Double(max(points.count - 1, 0)) + 0.6)
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                    .font(Typo.monoSmall)
-                    .foregroundStyle(Palette.graphite)
+            AxisMarks(values: axisIndices) { value in
+                if let position = value.as(Double.self) {
+                    let index = Int(position.rounded())
+                    if points.indices.contains(index) {
+                        AxisValueLabel {
+                            Text(points[index].date, format: .dateTime.month(.abbreviated).day())
+                                .font(Typo.monoSmall)
+                                .foregroundStyle(Palette.graphite)
+                        }
+                    }
+                }
             }
         }
         .chartYAxis {
@@ -90,6 +93,13 @@ struct CompositionChartCard: View {
             }
         }
         .frame(height: 180)
+    }
+
+    /// A few evenly spread positions for date labels (first, thirds, last).
+    private var axisIndices: [Double] {
+        let last = points.count - 1
+        guard last > 0 else { return [0] }
+        return Array(Set([0, last / 3, 2 * last / 3, last])).sorted().map(Double.init)
     }
 
     private var legend: some View {

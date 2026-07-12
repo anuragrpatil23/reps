@@ -46,7 +46,7 @@
 		808A4AF67562BF42CDE86016 /* RepsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepsApp.swift; sourceTree = "<group>"; };
 		814D767C115D1D463103432C /* WorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutCardView.swift; sourceTree = "<group>"; };
 		89F73E9CB8B46A571B9DEA48 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D65A23039317C53E1B45E3F /* MetricChartCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartCard.swift; sourceTree = "<group>"; };
 		93937C7381A80F80BB707591 /* CompositionChartCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionChartCard.swift; sourceTree = "<group>"; };
 		A15F45625B8B6BDC264E0889 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -268,6 +268,7 @@
 				CODE_SIGN_ENTITLEMENTS = Reps/Reps.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2LWQ9LQUGT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Reps/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -410,6 +411,7 @@
 				CODE_SIGN_ENTITLEMENTS = Reps/Reps.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2LWQ9LQUGT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Reps/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
