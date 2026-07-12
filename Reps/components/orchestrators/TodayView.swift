@@ -37,7 +37,7 @@ struct TodayView: View {
         return EnergyBudget(
             leanMassLbs: metrics?.leanMass,
             weightLbs: metrics?.weightLbs,
-            activeKcal: Double(log?.activity?.moveKcal ?? 0),
+            activeKcal: Double(max(log?.activity?.moveKcal ?? 0, sessionEnergy(on: selectedDay))),
             intake: store.macros(for: selectedDay),
             baselineOverride: baselineBurn,
             dailyDeficit: dailyDeficit,
@@ -52,6 +52,13 @@ struct TodayView: View {
     /// ring so a long session isn't hidden by Apple's stingy minute credit.
     private func sessionMinutes(on date: Date) -> Int {
         Int(store.workoutSessions(on: date).reduce(0) { $0 + $1.durationMin }.rounded())
+    }
+
+    /// Active energy the watch logged across the day's workouts — floors Move
+    /// the same way, so a session's burn isn't lost when Apple Health's daily
+    /// active-energy total doesn't sync cleanly with the watch's workouts.
+    private func sessionEnergy(on date: Date) -> Int {
+        Int(store.workoutSessions(on: date).reduce(0) { $0 + ($1.energyKcal ?? 0) }.rounded())
     }
 
     /// Rolling window ending today; empty days render as faint dots.
@@ -70,7 +77,11 @@ struct TodayView: View {
                     weightBlock
                         .padding(.bottom, 4)
                     if let activity = log?.activity {
-                        ActivityLineView(activity: activity, sessionMinutes: sessionMinutes(on: selectedDay))
+                        ActivityLineView(
+                            activity: activity,
+                            sessionMinutes: sessionMinutes(on: selectedDay),
+                            sessionEnergy: sessionEnergy(on: selectedDay)
+                        )
                             .cardStock(Palette.sage)
                     }
                     sleepSection

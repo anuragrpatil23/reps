@@ -7,12 +7,17 @@ struct ActivityLineView: View {
     /// exercise-minute credit is stingy for low-HR work (a 45m strength
     /// session can score 2m), so we floor Exercise at recorded workout time.
     var sessionMinutes: Int = 0
+    /// Active energy the watch logged across the day's workouts. Apple Health's
+    /// daily Move total doesn't always sync cleanly with recorded workouts, so
+    /// we floor Move at the recorded session burn the same way as Exercise.
+    var sessionEnergy: Int = 0
 
     private var exerciseMin: Int { max(activity.exerciseMin, sessionMinutes) }
+    private var moveKcal: Int { max(activity.moveKcal, sessionEnergy) }
 
     var body: some View {
         HStack(spacing: 18) {
-            metric("Move", value: "\(activity.moveKcal)", progress: ratio(activity.moveKcal, activity.moveGoalKcal))
+            metric("Move", value: "\(moveKcal)", progress: ratio(moveKcal, activity.moveGoalKcal))
             metric("Exercise", value: "\(exerciseMin)m", progress: ratio(exerciseMin, activity.exerciseGoalMin))
             metric("Stand", value: "\(activity.standHours)", progress: ratio(activity.standHours, activity.standGoalHours))
             Spacer(minLength: 0)
