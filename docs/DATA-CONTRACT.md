@@ -172,9 +172,8 @@ Path: `sffit/templates/<key>.md`. A template defines a workout's exercise list a
 ---
 schema_version: 1
 type: sffit-workout-template
-key: push-a                   # stable id referenced by daily logs
+key: push-a                   # stable id referenced by daily logs & programs
 title: Push A
-days: [mon, thu]              # optional scheduling hint
 exercises:
   - name: Bench Press
     sets: [ { reps: 8, weight_lbs: 95 }, { reps: 8, weight_lbs: 95 }, { reps: 6, weight_lbs: 100 } ]
@@ -188,6 +187,34 @@ exercises:
 
 Notes on form cues, substitutions, etc.
 ```
+
+The app is the sole writer of `sffit/templates/` — templates are created and edited in-app (Settings → Training → Workouts).
+
+## 3a. Training programs (blocks)
+
+Path: `sffit/programs/<key>.md`. A program is a training block, grouped by
+phase, that schedules the week: an ordered **rotation** of template keys walked
+across training days (skipping `rest_days`), continuing week to week from
+`anchor`. Because the rotation is continuous, when its length doesn't divide the
+training-days-per-week the same weekday drifts to the next workout each week —
+that's the intended behavior.
+
+```markdown
+---
+schema_version: 1
+type: sffit-program
+key: april-cut
+title: April Cut
+phase: cut                    # cut | bulk | maintenance | other
+rotation: [push-a, pull, legs, push-b]   # template keys, in cycle order
+rest_days: [tue, fri]         # weekdays that are always rest
+anchor: 2026-04-01            # the day rotation[0] is (or was) performed
+---
+```
+
+The **active** program (which one drives the schedule) is a device preference,
+not vault data — stored in app defaults, not here. Multiple programs can exist;
+you switch between them in-app.
 
 ## 4. Progress pics
 
@@ -213,6 +240,29 @@ Notes on form cues, substitutions, etc.
 - `schema_version` is per-file. The app reads all versions it knows, writes only the newest.
 - Additive changes (new optional keys) don't bump the version. Renames/semantic changes do, with a migration note appended to this doc.
 
+## 8. Food database
+
+Path: `sffood/data/foods.csv`. The personal food DB — one row per food, nutrition
+**per serving**. Logged meals reference a food by `id` and carry a `servings`
+multiplier (grams ÷ `serving_grams` when logged by weight). Header-driven columns
+(order comes from the file's own header row) so new fields are additive:
+
+```
+id,name,serving_desc,serving_grams,servings_per_container,
+calories,protein_g,carbs_g,fat_g,
+sat_fat_g,trans_fat_g,cholesterol_mg,sodium_mg,
+fiber_g,total_sugars_g,added_sugars_g,
+vitamin_d_mcg,calcium_mg,iron_mg,potassium_mg,
+barcode,updated_at
+```
+
+Older 9-column files (`id,name,serving_desc,calories,protein_g,carbs_g,fat_g,barcode,updated_at`)
+still load — absent columns read as zero/absent. This is `sffood/data/`, which
+the app owns for the food DB (the rest of `sffood/` stays read-only).
+
 ## Version history
 
 - **v1** (2026-07-11): initial contract — daily log, templates, pics, food-as-text/link.
+- **v1** (2026-07-12, additive): training programs (`sffit-program`); full
+  Nutrition-Facts columns + `serving_grams` in `foods.csv`; app now writes
+  templates. All additive — no version bump (contract §7).

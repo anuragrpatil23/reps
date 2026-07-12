@@ -11,11 +11,25 @@ final class LogStore {
 
     private(set) var logsByDay: [Date: DailyLog] = [:]
     private(set) var templates: [WorkoutTemplate] = []
+    private(set) var programs: [Program] = []
     private(set) var foods: [Food] = []
     private(set) var loaded = false
     var lastError: String?
 
-    private var foodsById: [String: Food] { Dictionary(foods.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) }
+    /// Key of the active training program (drives the day's scheduled workout).
+    /// Persisted in UserDefaults — a preference, not vault data.
+    private static let activeProgramDefaultsKey = "reps.activeProgramKey"
+    var activeProgramKey: String? = UserDefaults.standard.string(forKey: activeProgramDefaultsKey) {
+        didSet { UserDefaults.standard.set(activeProgramKey, forKey: Self.activeProgramDefaultsKey) }
+    }
+    var activeProgram: Program? {
+        guard let key = activeProgramKey else { return nil }
+        return programs.first { $0.key == key }
+    }
+
+    /// Memoized food lookup — rebuilt only when `foods` changes, so it's not
+    /// re-derived on every view render (kept the keyboard/UI responsive).
+    private var foodsById: [String: Food] = [:]
 
     // Telemetry lives in CSVs, not the daily markdown. These are the in-memory
     // mirrors we flush whole-file on change; logsByDay is the joined view.
@@ -64,13 +78,19 @@ final class LogStore {
 
         let fromVault = vault.readTemplates()
         templates = fromVault.isEmpty ? [.builtinPushA] : fromVault
+        programs = vault.readPrograms()
         foods = vault.readFoods()
+        rebuildFoodIndex()
         loaded = true
     }
 
     // MARK: - Food database
 
     func food(_ id: String) -> Food? { foodsById[id] }
+
+    private func rebuildFoodIndex() {
+        foodsById = Dictionary(foods.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    }
 
     func saveFood(_ food: Food) {
         var updated = food
@@ -80,11 +100,13 @@ final class LogStore {
         } else {
             foods.append(updated)
         }
+        rebuildFoodIndex()
         flushFoods()
     }
 
     func deleteFood(_ id: String) {
         foods.removeAll { $0.id == id }
+        rebuildFoodIndex()
         flushFoods()
     }
 
@@ -95,11 +117,92 @@ final class LogStore {
 
     /// A unique slug id for a new food name (suffixes on collision).
     func uniqueFoodId(for name: String) -> String {
+        uniqueKey(for: name) { key in foodsById[key] != nil }
+    }
+
+    /// A unique key from a name, suffixing while `taken` reports a collision.
+    private func uniqueKey(for name: String, taken: (String) -> Bool) -> String {
         let base = Food.slug(for: name)
-        guard foodsById[base] != nil else { return base }
+        guard taken(base) else { return base }
         var n = 2
-        while foodsById["\(base)-\(n)"] != nil { n += 1 }
+        while taken("\(base)-\(n)") { n += 1 }
         return "\(base)-\(n)"
+    }
+
+    // MARK: - Templates (workout definitions)
+
+    func template(_ key: String) -> WorkoutTemplate? {
+        templates.first { $0.key == key }
+    }
+
+    func uniqueTemplateKey(for title: String) -> String {
+        uniqueKey(for: title) { key in templates.contains { $0.key == key } }
+    }
+
+    func saveTemplate(_ template: WorkoutTemplate) {
+        if let index = templates.firstIndex(where: { $0.key == template.key }) {
+            templates[index] = template
+        } else {
+            templates.append(template)
+        }
+        do { try vault.writeTemplate(template) }
+        catch { lastError = "Couldn't save workout: \(error.localizedDescription)" }
+    }
+
+    func deleteTemplate(_ key: String) {
+        templates.removeAll { $0.key == key }
+        // Drop the deleted template from any program rotation that referenced it.
+        for index in programs.indices where programs[index].rotation.contains(key) {
+            programs[index].rotation.removeAll { $0 == key }
+            try? vault.writeProgram(programs[index])
+        }
+        do { try vault.deleteTemplate(key: key) }
+        catch { lastError = "Couldn't delete workout: \(error.localizedDescription)" }
+    }
+
+    // MARK: - Programs (training blocks)
+
+    func uniqueProgramKey(for title: String) -> String {
+        uniqueKey(for: title) { key in programs.contains { $0.key == key } }
+    }
+
+    func saveProgram(_ program: Program) {
+        if let index = programs.firstIndex(where: { $0.key == program.key }) {
+            programs[index] = program
+        } else {
+            programs.append(program)
+        }
+        if activeProgramKey == nil { activeProgramKey = program.key }
+        do { try vault.writeProgram(program) }
+        catch { lastError = "Couldn't save program: \(error.localizedDescription)" }
+    }
+
+    func deleteProgram(_ key: String) {
+        programs.removeAll { $0.key == key }
+        if activeProgramKey == key { activeProgramKey = programs.first?.key }
+        do { try vault.deleteProgram(key: key) }
+        catch { lastError = "Couldn't delete program: \(error.localizedDescription)" }
+    }
+
+    /// Whether the active program schedules `date` as a rest day.
+    func isScheduledRestDay(_ date: Date) -> Bool {
+        activeProgram?.isRestDay(date) ?? false
+    }
+
+    // MARK: - Apple Watch sessions (workouts.csv, per day)
+
+    /// Recorded Apple Watch workout sessions on `date` (functional strength,
+    /// walks, etc.), most recent first.
+    func workoutSessions(on date: Date) -> [WorkoutRecord] {
+        let day = Calendar.current.startOfDay(for: date)
+        return workouts.filter { $0.day == day }.sorted { $0.start > $1.start }
+    }
+
+    /// The night's sleep for `date` (keyed to the wake-up day): asleep/in-bed
+    /// totals and per-stage minutes (rem/core/deep/awake), as recorded by the
+    /// watch. Nil when there's no sleep sample for that day.
+    func sleep(on date: Date) -> [String: Double]? {
+        sleepByDay[Calendar.current.startOfDay(for: date)]
     }
 
     // MARK: - Macros
@@ -152,9 +255,32 @@ final class LogStore {
         return current - prior
     }
 
-    /// Sticky defaults: last completed workout → template baseline.
+    /// Sticky defaults for the day, program-aware:
+    /// - active program schedules a rest day → a rest entry.
+    /// - active program schedules a template → that template, with weights
+    ///   carried from its last completed session (falls back to the baseline).
+    /// - no active program → last completed workout → first template baseline.
     func stickyWorkout(for date: Date) -> WorkoutEntry {
         let day = Calendar.current.startOfDay(for: date)
+
+        if let program = activeProgram {
+            if program.isRestDay(date) {
+                return WorkoutEntry(status: .rest)
+            }
+            if let key = program.scheduledTemplateKey(on: date),
+               let template = template(key) {
+                let lastSets = logsByDay.values
+                    .filter { $0.date < day }
+                    .sorted { $0.date > $1.date }
+                    .compactMap(\.workout)
+                    .first { ($0.status == .done || $0.status == .partial) && $0.template == key }
+                return WorkoutEntry(
+                    status: .skipped, template: template.key, title: template.title,
+                    exercises: lastSets?.exercises ?? template.exercises
+                )
+            }
+        }
+
         let last = logsByDay.values
             .filter { $0.date < day }
             .sorted { $0.date > $1.date }
@@ -301,6 +427,14 @@ final class LogStore {
         writeDoc(log)
     }
 
+    /// Remove a logged food entry from a day (an explicit user edit, allowed by
+    /// contract §5). No-op if the day or entry is gone.
+    func removeFood(_ entry: FoodEntry, on date: Date) {
+        guard var log = log(for: date) else { return }
+        log.food.removeAll { $0.id == entry.id }
+        writeDoc(log)
+    }
+
     func addPhoto(_ jpeg: Data, pose: PicPose, on date: Date) {
         do {
             let path = try vault.savePhoto(jpeg, date: date, pose: pose)
@@ -383,6 +517,19 @@ final class LogStore {
     func respiratorySeries(_ column: String) -> [MetricPoint] { healthSeries(respiratoryByDay, column) }
     /// Sleep asleep-time as hours.
     func sleepHoursSeries() -> [MetricPoint] { healthSeries(sleepByDay, "asleep_min", scale: 1.0 / 60.0) }
+
+    /// Nightly sleep split into stages (hours), oldest → newest. Only nights the
+    /// watch broke into stages (deep/core/REM) are included.
+    func sleepStageSeries() -> [SleepNight] {
+        sleepByDay.keys.sorted().compactMap { day in
+            guard let s = sleepByDay[day] else { return nil }
+            let deep = s["deep_min"] ?? 0, core = s["core_min"] ?? 0
+            let rem = s["rem_min"] ?? 0, awake = s["awake_min"] ?? 0
+            guard deep + core + rem > 0 else { return nil }   // needs stage data
+            return SleepNight(date: day, deepH: deep / 60, coreH: core / 60,
+                              remH: rem / 60, awakeH: awake / 60)
+        }
+    }
 
     /// Rebuild the joined view after telemetry changes (no file reads).
     private func rejoin() {

@@ -33,6 +33,31 @@ struct BodyMetrics: Codable, Sendable, Equatable {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
+    /// Fat mass in lbs — from lean mass when present, else from body-fat %.
+    var fatMassLbs: Double? {
+        if let leanMassLbs { return max(weightLbs - leanMassLbs, 0) }
+        if let bodyFatPct { return weightLbs * bodyFatPct / 100 }
+        return nil
+    }
+
+    /// Lean (fat-free) mass in lbs.
+    var leanMass: Double? {
+        if let leanMassLbs { return leanMassLbs }
+        if let fatMassLbs { return weightLbs - fatMassLbs }
+        return nil
+    }
+
+    /// Fat left to lose to reach `targetPct` body fat, holding lean mass
+    /// constant. Nil if there's no composition data or you're already at/below
+    /// the target. Returns (fatLbs to lose, target weight, percentage points).
+    func fatToLose(targetPct: Double) -> (fatLbs: Double, targetWeightLbs: Double, points: Double)? {
+        guard targetPct > 0, targetPct < 100,
+              let lean = leanMass, let currentPct = bodyFatPct,
+              currentPct > targetPct else { return nil }
+        let targetWeight = lean / (1 - targetPct / 100)
+        return (weightLbs - targetWeight, targetWeight, currentPct - targetPct)
+    }
+
     private func trim(_ value: Double) -> String {
         value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
     }

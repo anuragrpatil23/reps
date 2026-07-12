@@ -138,6 +138,20 @@ enum DailyLogCodec {
 
     // MARK: - Templates
 
+    /// A workout template → markdown (the app owns `sffit/templates/`, so it can
+    /// now write these, not just read seeds).
+    static func templateMarkdown(for template: WorkoutTemplate) throws -> String {
+        let fm: [String: Any] = [
+            "schema_version": schemaVersion,
+            "type": "sffit-workout-template",
+            "key": template.key,
+            "title": template.title,
+            "exercises": template.exercises.map(exerciseDict),
+        ]
+        let yaml = try Yams.dump(object: fm, sortKeys: true)
+        return "---\n\(yaml)---\n"
+    }
+
     static func parseTemplate(_ text: String) -> WorkoutTemplate? {
         guard let (fm, _) = splitFrontmatter(text),
               fm["type"] as? String == "sffit-workout-template",
@@ -146,6 +160,42 @@ enum DailyLogCodec {
             key: key,
             title: fm["title"] as? String ?? key,
             exercises: parseExercises(fm["exercises"])
+        )
+    }
+
+    // MARK: - Programs (training blocks)
+
+    static func programMarkdown(for program: Program) throws -> String {
+        let fm: [String: Any] = [
+            "schema_version": schemaVersion,
+            "type": "sffit-program",
+            "key": program.key,
+            "title": program.title,
+            "phase": program.phase.rawValue,
+            "rotation": program.rotation,
+            "rest_days": program.restDays.sorted().map(\.code),
+            "anchor": dayString(program.anchor),
+        ]
+        let yaml = try Yams.dump(object: fm, sortKeys: true)
+        return "---\n\(yaml)---\n"
+    }
+
+    static func parseProgram(_ text: String) -> Program? {
+        guard let (fm, _) = splitFrontmatter(text),
+              fm["type"] as? String == "sffit-program",
+              let key = fm["key"] as? String else { return nil }
+        let rotation = (fm["rotation"] as? [Any])?.compactMap { $0 as? String } ?? []
+        let restCodes = (fm["rest_days"] as? [Any])?.compactMap { $0 as? String } ?? []
+        let restDays = Set(restCodes.compactMap(Weekday.from(code:)))
+        let anchor = (fm["anchor"] as? String).flatMap(day(from:)) ?? Date()
+        let phase = (fm["phase"] as? String).flatMap(TrainingPhase.init(rawValue:)) ?? .other
+        return Program(
+            key: key,
+            title: fm["title"] as? String ?? key,
+            phase: phase,
+            rotation: rotation,
+            restDays: restDays,
+            anchor: anchor
         )
     }
 

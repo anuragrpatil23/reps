@@ -6,10 +6,47 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingFolderPicker = false
     @State private var healthStatus: String?
+    @State private var showingProgram = false
+    @AppStorage("reps.targetBodyFatPct") private var targetBodyFatPct = 0.0
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Button {
+                        showingProgram = true
+                    } label: {
+                        HStack {
+                            Text("Training program").font(Typo.body).foregroundStyle(Palette.ink)
+                            Spacer()
+                            Text(store.activeProgram?.title ?? "None")
+                                .font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Palette.hairline)
+                        }
+                    }
+                } header: {
+                    Text("Training")
+                } footer: {
+                    Text("Set up your workouts and the weekly rotation that schedules them.")
+                }
+
+                Section {
+                    HStack {
+                        Text("Target body fat").font(Typo.body).foregroundStyle(Palette.ink)
+                        Spacer()
+                        TextField("e.g. 15", value: $targetBodyFatPct, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .font(Typo.mono)
+                            .frame(width: 60)
+                        Text("%").font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                    }
+                } header: {
+                    Text("Goal")
+                } footer: {
+                    Text("Today shows how much body fat is left to lose to hit this, holding lean mass steady. Set 0 to hide it.")
+                }
+
                 Section("Vault") {
                     if store.vaultConfigured {
                         Label {
@@ -102,6 +139,7 @@ struct SettingsSheet: View {
                     store.connectVault(to: url)
                 }
             }
+            .sheet(isPresented: $showingProgram) { ProgramSheet() }
         }
     }
 }

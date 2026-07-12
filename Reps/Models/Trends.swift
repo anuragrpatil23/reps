@@ -19,6 +19,19 @@ struct WeekBar: Identifiable, Sendable {
     var id: Date { weekStart }
 }
 
+/// One night split into sleep stages (hours), as recorded by the watch.
+struct SleepNight: Identifiable, Sendable, Dated {
+    let date: Date
+    let deepH: Double
+    let coreH: Double
+    let remH: Double
+    let awakeH: Double
+
+    /// Time actually asleep (excludes awake-in-bed).
+    var asleepH: Double { deepH + coreH + remH }
+    var id: Date { date }
+}
+
 /// One weigh-in split into its mass components. `leanLbs + fatLbs == weight`.
 struct CompositionPoint: Identifiable, Sendable, Dated {
     let date: Date

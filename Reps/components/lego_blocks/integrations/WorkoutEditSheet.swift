@@ -6,6 +6,7 @@ struct WorkoutEditSheet: View {
     @State var draft: WorkoutEntry
     let onSave: (WorkoutEntry) -> Void
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var editing: Bool
 
     var body: some View {
         NavigationStack {
@@ -44,6 +45,10 @@ struct WorkoutEditSheet: View {
                     .font(Typo.label)
                     .foregroundStyle(Palette.graphite)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { editing = false }.foregroundStyle(Palette.madder)
+                }
             }
         }
     }
@@ -60,7 +65,7 @@ struct WorkoutEditSheet: View {
                 cardioEditor(exercise)
             }
         }
-        .cardStock(Palette.chalk)
+        .flatCard(Palette.chalk)
     }
 
     private func setsEditor(_ exercise: Binding<ExerciseEntry>) -> some View {
@@ -156,10 +161,11 @@ struct WorkoutEditSheet: View {
                 format: integer ? .number.precision(.fractionLength(0)) : .number
             )
             .keyboardType(integer ? .numberPad : .decimalPad)
+            .focused($editing)
             .font(Typo.mono)
             .foregroundStyle(Palette.ink)
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.vertical, 10)
             .frame(width: 78)
             .background(Palette.paper, in: RoundedRectangle(cornerRadius: 8))
             Text(unit)

@@ -11,9 +11,9 @@ struct TodayView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var pendingPhoto: Data?
     @State private var showingCamera = false
-    @State private var noteDraft = ""
-    @State private var noteDay: Date?
-    @FocusState private var noteFocused: Bool
+
+    /// Target body-fat %, a personal preference (0 = unset). Shared with Settings.
+    @AppStorage("reps.targetBodyFatPct") private var targetBodyFatPct = 0.0
 
     private var log: DailyLog? { store.log(for: selectedDay) }
 
@@ -36,11 +36,19 @@ struct TodayView: View {
                         ActivityLineView(activity: activity)
                             .cardStock(Palette.sage)
                     }
+                    sleepSection
+                    sessionsSection
                     workoutSection
                     foodSection
                         .cardStock(Palette.butter)
                     picsSection
-                    notesSection
+                    DayNotesEditor(
+                        day: selectedDay,
+                        initialText: log?.note ?? ""
+                    ) { note in
+                        store.saveNote(note, on: selectedDay)
+                    }
+                    .id(selectedDay)   // fresh editor per day; commits the one we leave
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
@@ -60,21 +68,7 @@ struct TodayView: View {
         .animation(.easeOut(duration: 0.18), value: selectedDay)
         .task {
             if !store.loaded { store.load() }
-            syncNote()
             await store.syncHealth(around: selectedDay)
-        }
-        .onChange(of: selectedDay) {
-            commitNote()   // save the day we're leaving
-            syncNote()     // load the day we're entering
-        }
-        .toolbar {
-            if noteFocused {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { noteFocused = false }
-                        .foregroundStyle(Palette.madder)
-                }
-            }
         }
         .sheet(isPresented: $showingWorkoutSheet) {
             WorkoutEditSheet(draft: log?.workout ?? store.stickyWorkout(for: selectedDay)) { final in
@@ -183,6 +177,12 @@ struct TodayView: View {
                         .foregroundStyle(Palette.graphite)
                         .padding(.top, 1)
                 }
+                if targetBodyFatPct > 0, let goal = metrics.fatToLose(targetPct: targetBodyFatPct) {
+                    Text("\(goal.fatLbs.formatted(.number.precision(.fractionLength(1)))) lbs of fat to lose · to \(targetBodyFatPct.formatted(.number.precision(.fractionLength(0...1))))%")
+                        .font(Typo.monoSmall)
+                        .foregroundStyle(Palette.madder)
+                        .padding(.top, 1)
+                }
                 if let carried, let day = carried.day as Date? {
                     Text("as of \(day.formatted(.dateTime.month(.abbreviated).day()))")
                         .font(Typo.monoSmall)
@@ -238,24 +238,36 @@ struct TodayView: View {
             }
             if let food = log?.food, !food.isEmpty {
                 ForEach(Array(food.enumerated()), id: \.element.id) { index, entry in
-                    HStack(alignment: .firstTextBaseline, spacing: 14) {
-                        Text(entry.at)
-                            .font(Typo.mono)
-                            .foregroundStyle(Palette.graphite)
-                        Text(foodLabel(entry))
-                            .font(Typo.body)
-                            .foregroundStyle(Palette.ink)
-                        Spacer(minLength: 0)
-                        if let m = store.macros(for: entry) {
-                            Text("\(Int(m.calories.rounded()))")
+                    SwipeToDeleteRow(background: Palette.butter) {
+                        store.removeFood(entry, on: selectedDay)
+                    } content: {
+                        HStack(alignment: .firstTextBaseline, spacing: 14) {
+                            Text(entry.at)
                                 .font(Typo.mono)
                                 .foregroundStyle(Palette.graphite)
+                            Text(foodLabel(entry))
+                                .font(Typo.body)
+                                .foregroundStyle(Palette.ink)
+                            Spacer(minLength: 0)
+                            if let m = store.macros(for: entry) {
+                                Text("\(Int(m.calories.rounded()))")
+                                    .font(Typo.mono)
+                                    .foregroundStyle(Palette.graphite)
+                            }
                         }
-                    }
-                    .padding(.vertical, 9)
-                    .overlay(alignment: .bottom) {
-                        if index < food.count - 1 {
-                            Rectangle().fill(Palette.hairline).frame(height: 0.5)
+                        .padding(.vertical, 9)
+                        .contentShape(Rectangle())
+                        .overlay(alignment: .bottom) {
+                            if index < food.count - 1 {
+                                Rectangle().fill(Palette.hairline).frame(height: 0.5)
+                            }
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                store.removeFood(entry, on: selectedDay)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
@@ -280,11 +292,18 @@ struct TodayView: View {
     private var macroTotals: some View {
         let total = store.macros(for: selectedDay)
         if !total.isEmpty {
-            HStack(spacing: 6) {
-                Text("\(Int(total.calories.rounded())) kcal")
-                    .foregroundStyle(Palette.ink)
-                Text("· \(Int(total.proteinG.rounded()))P · \(Int(total.carbsG.rounded()))C · \(Int(total.fatG.rounded()))F")
-                    .foregroundStyle(Palette.graphite)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("\(Int(total.calories.rounded())) kcal")
+                        .foregroundStyle(Palette.ink)
+                    Text("· \(Int(total.proteinG.rounded()))P · \(Int(total.carbsG.rounded()))C · \(Int(total.fatG.rounded()))F")
+                        .foregroundStyle(Palette.graphite)
+                }
+                // Second line: the extras worth watching on a cut, when present.
+                if total.fiberG > 0 || total.totalSugarsG > 0 || total.sodiumMg > 0 || total.satFatG > 0 {
+                    Text("\(Int(total.fiberG.rounded()))g fiber · \(Int(total.totalSugarsG.rounded()))g sugar · \(Int(total.satFatG.rounded()))g sat · \(Int(total.sodiumMg.rounded()))mg Na")
+                        .foregroundStyle(Palette.graphite)
+                }
             }
             .font(Typo.mono)
             .padding(.top, 10)
@@ -347,45 +366,101 @@ struct TodayView: View {
             Text(pic.pose.rawValue)
                 .font(Typo.monoSmall)
                 .foregroundStyle(Palette.paper)
-                .shadow(color: Palette.ink.opacity(0.6), radius: 2)
+                .shadow(color: .black.opacity(0.7), radius: 2)
                 .padding(.bottom, 6)
         }
     }
 
-    // MARK: notes (the markdown body — the day's journal)
+    // MARK: sleep (nightly stages from sleep.csv)
 
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Notes")
-            TextField("How did today feel?", text: $noteDraft, axis: .vertical)
-                .font(Typo.body)
-                .foregroundStyle(Palette.ink)
-                .tint(Palette.madder)
-                .lineLimit(1...10)
-                .focused($noteFocused)
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.chalk.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
-                .onChange(of: noteFocused) { _, focused in
-                    if !focused { commitNote() }
+    @ViewBuilder
+    private var sleepSection: some View {
+        if let sleep = store.sleep(on: selectedDay), let asleep = sleep["asleep_min"], asleep > 0 {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    sectionHeader("Sleep")
+                    Spacer()
+                    Text("\(hoursMinutes(asleep)) asleep")
+                        .font(Typo.mono)
+                        .foregroundStyle(Palette.ink)
                 }
+                // Stage breakdown, in the order the night is usually read.
+                let stages: [(String, String)] = [
+                    ("deep_min", "Deep"), ("core_min", "Core"),
+                    ("rem_min", "REM"), ("awake_min", "Awake"),
+                ]
+                let present = stages.compactMap { key, label -> (String, Double)? in
+                    guard let m = sleep[key], m > 0 else { return nil }
+                    return (label, m)
+                }
+                if !present.isEmpty {
+                    HStack(spacing: 16) {
+                        ForEach(present, id: \.0) { label, minutes in
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(hoursMinutes(minutes)).font(Typo.mono).foregroundStyle(Palette.ink)
+                                Text(label).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+                if let inBed = sleep["in_bed_min"], inBed > 0 {
+                    Text("\(hoursMinutes(inBed)) in bed")
+                        .font(Typo.monoSmall)
+                        .foregroundStyle(Palette.graphite)
+                }
+            }
+            .cardStock(Palette.sage)
         }
     }
 
-    /// Load the selected day's note into the editable draft.
-    private func syncNote() {
-        noteDraft = store.log(for: selectedDay)?.note ?? ""
-        noteDay = selectedDay
+    /// Minutes → "6h 58m" / "42m".
+    private func hoursMinutes(_ minutes: Double) -> String {
+        let total = Int(minutes.rounded())
+        let h = total / 60
+        let m = total % 60
+        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
     }
 
-    /// Persist the draft to the day it belongs to, if it changed.
-    private func commitNote() {
-        guard let day = noteDay else { return }
-        let trimmed = noteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        let existing = store.log(for: day)?.note ?? ""
-        if trimmed != existing {
-            store.saveNote(trimmed.isEmpty ? nil : trimmed, on: day)
+    // MARK: Apple Watch sessions (recorded workouts.csv for the day)
+
+    @ViewBuilder
+    private var sessionsSection: some View {
+        let sessions = store.workoutSessions(on: selectedDay)
+        if !sessions.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionHeader("Sessions")
+                ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(session.start.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))
+                            .font(Typo.mono)
+                            .foregroundStyle(Palette.graphite)
+                        Text(session.type)
+                            .font(Typo.body)
+                            .foregroundStyle(Palette.ink)
+                        Spacer(minLength: 0)
+                        Text(sessionDetail(session))
+                            .font(Typo.mono)
+                            .foregroundStyle(Palette.graphite)
+                    }
+                    .padding(.vertical, 9)
+                    .overlay(alignment: .bottom) {
+                        if index < sessions.count - 1 {
+                            Rectangle().fill(Palette.hairline).frame(height: 0.5)
+                        }
+                    }
+                }
+            }
+            .cardStock(Palette.sage)
         }
+    }
+
+    /// "45m · 320 kcal · 128 bpm" — whatever the watch recorded.
+    private func sessionDetail(_ session: WorkoutRecord) -> String {
+        var parts = ["\(Int(session.durationMin.rounded()))m"]
+        if let kcal = session.energyKcal { parts.append("\(Int(kcal.rounded())) kcal") }
+        if let hr = session.avgHR { parts.append("\(Int(hr.rounded())) bpm") }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: shared bits
@@ -402,6 +477,67 @@ struct TodayView: View {
             .font(Typo.body)
             .foregroundStyle(Palette.graphite)
             .padding(.vertical, 9)
+    }
+}
+
+/// The day's journal note, isolated in its own view with local draft state.
+/// Keeping the text field out of `TodayView` means each keystroke re-renders
+/// only this small view — not the 120-day spine, food math, and charts — which
+/// is what kept the keyboard sluggish/unresponsive on the first tap. Commits on
+/// blur and on teardown (the parent gives it `.id(day)`, so switching days
+/// rebuilds it and flushes the day we left).
+private struct DayNotesEditor: View {
+    let day: Date
+    let initialText: String
+    let onCommit: (String?) -> Void
+
+    @State private var draft: String
+    @FocusState private var focused: Bool
+
+    init(day: Date, initialText: String, onCommit: @escaping (String?) -> Void) {
+        self.day = day
+        self.initialText = initialText
+        self.onCommit = onCommit
+        _draft = State(initialValue: initialText)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Notes")
+                .font(Typo.display)
+                .foregroundStyle(Palette.ink)
+                .padding(.bottom, 6)
+            TextField("How did today feel?", text: $draft, axis: .vertical)
+                .font(Typo.body)
+                .foregroundStyle(Palette.ink)
+                .tint(Palette.madder)
+                .lineLimit(4...10)
+                .focused($focused)
+                .padding(16)
+                .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+                .background(Palette.chalk.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                .contentShape(Rectangle())
+                .onTapGesture { focused = true }
+                .onChange(of: focused) { _, isFocused in
+                    if !isFocused { commit() }
+                }
+        }
+        .onDisappear { commit() }
+        .toolbar {
+            if focused {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focused = false }
+                        .foregroundStyle(Palette.madder)
+                }
+            }
+        }
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != initialText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+        onCommit(trimmed.isEmpty ? nil : trimmed)
     }
 }
 

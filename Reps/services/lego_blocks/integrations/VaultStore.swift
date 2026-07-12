@@ -136,6 +136,61 @@ final class VaultStore {
         } ?? []
     }
 
+    /// Write a template the user created/edited (app owns `sffit/templates/`).
+    func writeTemplate(_ template: WorkoutTemplate) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: "sffit/templates/\(template.key).md")
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let text = try DailyLogCodec.templateMarkdown(for: template)
+            try Data(text.utf8).write(to: url, options: .atomic)
+        }
+    }
+
+    func deleteTemplate(key: String) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: "sffit/templates/\(key).md")
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
+    // MARK: - Programs (training blocks)
+
+    func readPrograms() -> [Program] {
+        withAccess { root in
+            let dir = root.appending(path: "sffit/programs")
+            guard let files = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil) else { return [] }
+            return files
+                .filter { $0.pathExtension == "md" }
+                .compactMap { url in
+                    guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                    return DailyLogCodec.parseProgram(text)
+                }
+        } ?? []
+    }
+
+    func writeProgram(_ program: Program) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: "sffit/programs/\(program.key).md")
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let text = try DailyLogCodec.programMarkdown(for: program)
+            try Data(text.utf8).write(to: url, options: .atomic)
+        }
+    }
+
+    func deleteProgram(key: String) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: "sffit/programs/\(key).md")
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
     // MARK: - Progress pics
 
     /// Saves JPEG data and returns the vault-relative path for the log entry.

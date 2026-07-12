@@ -2,7 +2,8 @@ import SwiftUI
 import PhotosUI
 
 /// Create or edit a food. Scan a nutrition label to prefill (Vision OCR +
-/// on-device model), then confirm/edit — everything stays editable.
+/// on-device model), then confirm/edit — everything stays editable. Captures the
+/// full Nutrition Facts panel; the fat/carb breakdown and micros are optional.
 struct FoodFormSheet: View {
     @Environment(LogStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -12,15 +13,15 @@ struct FoodFormSheet: View {
 
     @State private var name = ""
     @State private var servingDesc = ""
-    @State private var calories = 0.0
-    @State private var protein = 0.0
-    @State private var carbs = 0.0
-    @State private var fat = 0.0
+    @State private var servingGrams: Double?
+    @State private var servingsPerContainer: Double?
+    @State private var n = Macros()
 
     @State private var scanning = false
     @State private var showCamera = false
     @State private var showLibrary = false
     @State private var photoItem: PhotosPickerItem?
+    @FocusState private var focus: String?
 
     var body: some View {
         NavigationStack {
@@ -48,13 +49,35 @@ struct FoodFormSheet: View {
                 Section("Food") {
                     TextField("Name", text: $name).font(Typo.body)
                     TextField("Serving (e.g. 1 cup / 170g)", text: $servingDesc).font(Typo.body)
+                    optField("Serving weight", value: $servingGrams, unit: "g")
+                    optField("Servings / container", value: $servingsPerContainer, unit: "")
                 }
 
                 Section("Per serving") {
-                    macroField("Calories", value: $calories, unit: "kcal")
-                    macroField("Protein", value: $protein, unit: "g")
-                    macroField("Carbs", value: $carbs, unit: "g")
-                    macroField("Fat", value: $fat, unit: "g")
+                    macroField("Calories", value: $n.calories, unit: "kcal")
+                    macroField("Protein", value: $n.proteinG, unit: "g")
+                    macroField("Total carbs", value: $n.carbsG, unit: "g")
+                    macroField("Total fat", value: $n.fatG, unit: "g")
+                }
+
+                Section("Fat breakdown") {
+                    macroField("Saturated fat", value: $n.satFatG, unit: "g")
+                    macroField("Trans fat", value: $n.transFatG, unit: "g")
+                    macroField("Cholesterol", value: $n.cholesterolMg, unit: "mg")
+                }
+
+                Section("Carb breakdown") {
+                    macroField("Fiber", value: $n.fiberG, unit: "g")
+                    macroField("Total sugars", value: $n.totalSugarsG, unit: "g")
+                    macroField("Added sugars", value: $n.addedSugarsG, unit: "g")
+                    macroField("Sodium", value: $n.sodiumMg, unit: "mg")
+                }
+
+                Section("Micronutrients") {
+                    macroField("Vitamin D", value: $n.vitaminDMcg, unit: "mcg")
+                    macroField("Calcium", value: $n.calciumMg, unit: "mg")
+                    macroField("Iron", value: $n.ironMg, unit: "mg")
+                    macroField("Potassium", value: $n.potassiumMg, unit: "mg")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -70,6 +93,10 @@ struct FoodFormSheet: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(Palette.madder)
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focus = nil }.foregroundStyle(Palette.madder)
                 }
             }
             .fullScreenCover(isPresented: $showCamera) {
@@ -91,16 +118,37 @@ struct FoodFormSheet: View {
     }
 
     private func macroField(_ label: String, value: Binding<Double>, unit: String) -> some View {
+        fieldRow(label, unit: unit) {
+            TextField(label, value: value, format: .number).focused($focus, equals: label)
+        }
+    }
+
+    /// Like macroField but for an optional value (blank when unset).
+    private func optField(_ label: String, value: Binding<Double?>, unit: String) -> some View {
+        fieldRow(label, unit: unit) {
+            TextField(label, value: value, format: .number).focused($focus, equals: label)
+        }
+    }
+
+    /// A row whose whole width is the tap target — tapping anywhere focuses the
+    /// field, so you don't have to hit the small number box on the right.
+    private func fieldRow(_ label: String, unit: String,
+                          @ViewBuilder _ input: () -> some View) -> some View {
         HStack {
             Text(label).font(Typo.body).foregroundStyle(Palette.ink)
             Spacer()
-            TextField(label, value: value, format: .number)
+            input()
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .font(Typo.mono)
-                .frame(width: 80)
-            Text(unit).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                .frame(width: 90)
+            if !unit.isEmpty {
+                Text(unit).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                    .frame(width: 30, alignment: .leading)
+            }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { focus = label }
     }
 
     private func scan(_ image: UIImage) async {
@@ -108,20 +156,32 @@ struct FoodFormSheet: View {
         let facts = await NutritionExtractor.extract(from: image)
         if let v = facts.name, !v.isEmpty, name.isEmpty { name = v }
         if let v = facts.servingDesc, !v.isEmpty { servingDesc = v }
-        if let v = facts.calories { calories = v }
-        if let v = facts.proteinG { protein = v }
-        if let v = facts.carbsG { carbs = v }
-        if let v = facts.fatG { fat = v }
+        if let v = facts.servingGrams { servingGrams = v }
+        if let v = facts.servingsPerContainer { servingsPerContainer = v }
+        if let v = facts.calories { n.calories = v }
+        if let v = facts.proteinG { n.proteinG = v }
+        if let v = facts.carbsG { n.carbsG = v }
+        if let v = facts.fatG { n.fatG = v }
+        if let v = facts.satFatG { n.satFatG = v }
+        if let v = facts.transFatG { n.transFatG = v }
+        if let v = facts.cholesterolMg { n.cholesterolMg = v }
+        if let v = facts.sodiumMg { n.sodiumMg = v }
+        if let v = facts.fiberG { n.fiberG = v }
+        if let v = facts.totalSugarsG { n.totalSugarsG = v }
+        if let v = facts.addedSugarsG { n.addedSugarsG = v }
+        if let v = facts.vitaminDMcg { n.vitaminDMcg = v }
+        if let v = facts.calciumMg { n.calciumMg = v }
+        if let v = facts.ironMg { n.ironMg = v }
+        if let v = facts.potassiumMg { n.potassiumMg = v }
         scanning = false
     }
 
     private func populate(_ food: Food) {
         name = food.name
         servingDesc = food.servingDesc
-        calories = food.calories
-        protein = food.proteinG
-        carbs = food.carbsG
-        fat = food.fatG
+        servingGrams = food.servingGrams
+        servingsPerContainer = food.servingsPerContainer
+        n = food.nutrition
     }
 
     private func save() {
@@ -129,8 +189,8 @@ struct FoodFormSheet: View {
         let id = editing?.id ?? store.uniqueFoodId(for: trimmed)
         let food = Food(
             id: id, name: trimmed, servingDesc: servingDesc,
-            calories: calories, proteinG: protein, carbsG: carbs, fatG: fat,
-            barcode: editing?.barcode, updatedAt: nil
+            servingGrams: servingGrams, servingsPerContainer: servingsPerContainer,
+            nutrition: n, barcode: editing?.barcode, updatedAt: nil
         )
         store.saveFood(food)
         onSaved(food)

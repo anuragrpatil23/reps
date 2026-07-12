@@ -48,8 +48,7 @@ struct TrendsView: View {
                 .tracking(2.2)
                 .foregroundStyle(Palette.graphite)
                 .padding(.top, 8)
-            MetricChartCard(title: "Sleep", unit: "hr",
-                            points: ranged(store.sleepHoursSeries()), stock: Palette.chalk)
+            SleepStagesChartCard(nights: downsample(ranged(store.sleepStageSeries()), to: 12))
             MetricChartCard(title: "Steps", unit: "",
                             points: ranged(store.activitySeries(.steps)), stock: Palette.sage)
             MetricChartCard(title: "Active energy", unit: "kcal",
