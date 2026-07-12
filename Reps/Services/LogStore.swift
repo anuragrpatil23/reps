@@ -195,6 +195,13 @@ final class LogStore {
         upsert(log)
     }
 
+    /// Writes the free-prose journal to the day file's markdown body.
+    func saveNote(_ note: String?, on date: Date) {
+        var log = editableLog(for: date)
+        log.note = note
+        upsert(log)
+    }
+
     func addFood(_ entry: FoodEntry, on date: Date) {
         var log = editableLog(for: date)
         log.food.append(entry)

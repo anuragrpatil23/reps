@@ -10,6 +10,10 @@ struct TodayView: View {
     @State private var showingSettings = false
     @State private var photoItem: PhotosPickerItem?
     @State private var pendingPhoto: Data?
+    @State private var showingCamera = false
+    @State private var noteDraft = ""
+    @State private var noteDay: Date?
+    @FocusState private var noteFocused: Bool
 
     private var log: DailyLog? { store.log(for: selectedDay) }
 
@@ -36,10 +40,11 @@ struct TodayView: View {
                     foodSection
                         .cardStock(Palette.butter)
                     picsSection
+                    notesSection
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
-                .padding(.bottom, 12)
+                .padding(.bottom, 40)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .refreshable { await store.syncHealth(around: selectedDay) }
@@ -55,7 +60,21 @@ struct TodayView: View {
         .animation(.easeOut(duration: 0.18), value: selectedDay)
         .task {
             if !store.loaded { store.load() }
+            syncNote()
             await store.syncHealth(around: selectedDay)
+        }
+        .onChange(of: selectedDay) {
+            commitNote()   // save the day we're leaving
+            syncNote()     // load the day we're entering
+        }
+        .toolbar {
+            if noteFocused {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { noteFocused = false }
+                        .foregroundStyle(Palette.madder)
+                }
+            }
         }
         .sheet(isPresented: $showingWorkoutSheet) {
             WorkoutEditSheet(draft: log?.workout ?? store.stickyWorkout(for: selectedDay)) { final in
@@ -74,11 +93,18 @@ struct TodayView: View {
         .onChange(of: photoItem) {
             guard let photoItem else { return }
             Task {
-                if let data = try? await photoItem.loadTransferable(type: Data.self) {
-                    pendingPhoto = data
+                if let data = try? await photoItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    pendingPhoto = ProgressImage.encode(image)   // downscale + compress
                 }
                 self.photoItem = nil
             }
+        }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraCapture { image in
+                pendingPhoto = ProgressImage.encode(image)       // downscale + compress
+            }
+            .ignoresSafeArea()
         }
         .confirmationDialog("Which pose?", isPresented: pendingPoseBinding, titleVisibility: .visible) {
             ForEach([PicPose.front, .side, .back], id: \.rawValue) { pose in
@@ -245,19 +271,29 @@ struct TodayView: View {
                         picThumb(pic)
                     }
                 }
-                Button {
-                    photoPickerPresented = true
+                Menu {
+                    if CameraCapture.isAvailable {
+                        Button {
+                            showingCamera = true
+                        } label: {
+                            Label("Take photo", systemImage: "camera")
+                        }
+                    }
+                    Button {
+                        photoPickerPresented = true
+                    } label: {
+                        Label("Choose from library", systemImage: "photo.on.rectangle")
+                    }
                 } label: {
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(Palette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                         .frame(width: 64, height: 84)
                         .overlay {
-                            Image(systemName: "plus")
-                                .font(.system(size: 15, weight: .medium))
+                            Image(systemName: "camera")
+                                .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(Palette.madder)
                         }
                 }
-                .buttonStyle(.plain)
                 .accessibilityLabel("Add progress photo")
             }
         }
@@ -282,6 +318,42 @@ struct TodayView: View {
                 .foregroundStyle(Palette.paper)
                 .shadow(color: Palette.ink.opacity(0.6), radius: 2)
                 .padding(.bottom, 6)
+        }
+    }
+
+    // MARK: notes (the markdown body — the day's journal)
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Notes")
+            TextField("How did today feel?", text: $noteDraft, axis: .vertical)
+                .font(Typo.body)
+                .foregroundStyle(Palette.ink)
+                .tint(Palette.madder)
+                .lineLimit(1...10)
+                .focused($noteFocused)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Palette.chalk.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                .onChange(of: noteFocused) { _, focused in
+                    if !focused { commitNote() }
+                }
+        }
+    }
+
+    /// Load the selected day's note into the editable draft.
+    private func syncNote() {
+        noteDraft = store.log(for: selectedDay)?.note ?? ""
+        noteDay = selectedDay
+    }
+
+    /// Persist the draft to the day it belongs to, if it changed.
+    private func commitNote() {
+        guard let day = noteDay else { return }
+        let trimmed = noteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let existing = store.log(for: day)?.note ?? ""
+        if trimmed != existing {
+            store.saveNote(trimmed.isEmpty ? nil : trimmed, on: day)
         }
     }
 
