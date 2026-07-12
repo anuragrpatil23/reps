@@ -32,11 +32,205 @@ enum HealthKitService {
         ]
     }
 
+    /// Curated vitals we chart + export to heart.csv / respiratory.csv.
+    private static var vitalsTypes: Set<HKQuantityType> {
+        [
+            HKQuantityType(.heartRate),
+            HKQuantityType(.walkingHeartRateAverage),
+            HKQuantityType(.heartRateVariabilitySDNN),
+            HKQuantityType(.vo2Max),
+            HKQuantityType(.oxygenSaturation),
+            HKQuantityType(.respiratoryRate),
+            HKQuantityType(.appleSleepingWristTemperature),
+        ]
+    }
+
+    /// ~7 years — covers an Apple Watch owned since 2019.
+    static let fullHistoryDays = 2600
+
     static func requestAuthorization() async throws {
         var read: Set<HKObjectType> = bodyTypes
         read.formUnion(activityTypes)
+        read.formUnion(vitalsTypes)
         read.insert(HKObjectType.activitySummaryType())
+        read.insert(HKCategoryType(.sleepAnalysis))
+        read.insert(HKObjectType.workoutType())
         try await store.requestAuthorization(toShare: [], read: read)
+    }
+
+    // MARK: - Vitals (heart.csv / respiratory.csv)
+
+    enum Reduction { case sum, average, min, max }
+
+    /// One reduced value per day for `days` back.
+    private static func dailyMap(
+        _ id: HKQuantityTypeIdentifier, unit: HKUnit, days: Int, _ reduce: Reduction
+    ) async -> [Date: Double] {
+        let options: HKStatisticsOptions = switch reduce {
+        case .sum: .cumulativeSum
+        case .average: .discreteAverage
+        case .min: .discreteMin
+        case .max: .discreteMax
+        }
+        let cal = Calendar.current
+        let anchor = cal.startOfDay(for: Date())
+        let end = cal.date(byAdding: .day, value: 1, to: anchor) ?? anchor
+        let start = cal.date(byAdding: .day, value: -days, to: anchor) ?? anchor
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: HKQuantityType(id),
+                quantitySamplePredicate: HKQuery.predicateForSamples(withStart: start, end: end),
+                options: options, anchorDate: anchor, intervalComponents: DateComponents(day: 1)
+            )
+            query.initialResultsHandler = { _, collection, _ in
+                var result: [Date: Double] = [:]
+                collection?.enumerateStatistics(from: start, to: end) { stat, _ in
+                    let quantity: HKQuantity? = switch reduce {
+                    case .sum: stat.sumQuantity()
+                    case .average: stat.averageQuantity()
+                    case .min: stat.minimumQuantity()
+                    case .max: stat.maximumQuantity()
+                    }
+                    if let quantity {
+                        result[cal.startOfDay(for: stat.startDate)] = quantity.doubleValue(for: unit)
+                    }
+                }
+                continuation.resume(returning: result)
+            }
+            store.execute(query)
+        }
+    }
+
+    static func heartDaily(days: Int) async -> [Date: [String: Double]] {
+        let bpm = HKUnit.count().unitDivided(by: .minute())
+        let avg = await dailyMap(.heartRate, unit: bpm, days: days, .average)
+        let lo = await dailyMap(.heartRate, unit: bpm, days: days, .min)
+        let hi = await dailyMap(.heartRate, unit: bpm, days: days, .max)
+        let walking = await dailyMap(.walkingHeartRateAverage, unit: bpm, days: days, .average)
+        let hrv = await dailyMap(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), days: days, .average)
+        let vo2 = await dailyMap(.vo2Max, unit: HKUnit(from: "ml/kg*min"), days: days, .average)
+        return mergeColumns([
+            "avg_hr": avg, "min_hr": lo, "max_hr": hi,
+            "walking_hr": walking, "hrv_sdnn": hrv, "vo2max": vo2,
+        ])
+    }
+
+    static func respiratoryDaily(days: Int) async -> [Date: [String: Double]] {
+        let spo2Avg = (await dailyMap(.oxygenSaturation, unit: .percent(), days: days, .average)).mapValues { $0 * 100 }
+        let spo2Min = (await dailyMap(.oxygenSaturation, unit: .percent(), days: days, .min)).mapValues { $0 * 100 }
+        let respRate = await dailyMap(.respiratoryRate, unit: HKUnit.count().unitDivided(by: .minute()), days: days, .average)
+        let wristTemp = await dailyMap(.appleSleepingWristTemperature, unit: .degreeCelsius(), days: days, .average)
+        return mergeColumns([
+            "spo2_avg": spo2Avg, "spo2_min": spo2Min,
+            "respiratory_rate": respRate, "wrist_temp_c": wristTemp,
+        ])
+    }
+
+    private static func mergeColumns(_ columns: [String: [Date: Double]]) -> [Date: [String: Double]] {
+        var result: [Date: [String: Double]] = [:]
+        for (name, series) in columns {
+            for (day, value) in series {
+                result[day, default: [:]][name] = (value * 10).rounded() / 10
+            }
+        }
+        return result
+    }
+
+    // MARK: - Sleep (sleep.csv)
+
+    /// Nightly minutes by stage, keyed to the wake-up date (sample end day).
+    static func sleepDaily(days: Int) async -> [Date: [String: Double]] {
+        let cal = Calendar.current
+        let end = Date()
+        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: HKCategoryType(.sleepAnalysis), predicate: predicate,
+                limit: HKObjectQueryNoLimit, sortDescriptors: nil
+            ) { _, samples, _ in
+                var result: [Date: [String: Double]] = [:]
+                for case let s as HKCategorySample in samples ?? [] {
+                    let day = cal.startOfDay(for: s.endDate)
+                    let minutes = s.endDate.timeIntervalSince(s.startDate) / 60
+                    let column: String? = switch HKCategoryValueSleepAnalysis(rawValue: s.value) {
+                    case .inBed: "in_bed_min"
+                    case .awake: "awake_min"
+                    case .asleepREM: "rem_min"
+                    case .asleepCore: "core_min"
+                    case .asleepDeep: "deep_min"
+                    case .asleepUnspecified: "asleep_min"
+                    default: nil
+                    }
+                    guard let column else { continue }
+                    result[day, default: [:]][column, default: 0] += minutes
+                    // Stage samples also roll up into total asleep.
+                    if column != "in_bed_min" && column != "awake_min" && column != "asleep_min" {
+                        result[day, default: [:]]["asleep_min", default: 0] += minutes
+                    }
+                }
+                for day in result.keys {
+                    result[day] = result[day]?.mapValues { $0.rounded() }
+                }
+                continuation.resume(returning: result)
+            }
+            store.execute(query)
+        }
+    }
+
+    // MARK: - Workouts (workouts.csv)
+
+    static func workoutHistory(days: Int) async -> [WorkoutRecord] {
+        let cal = Calendar.current
+        let end = Date()
+        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(), predicate: predicate,
+                limit: HKObjectQueryNoLimit, sortDescriptors: nil
+            ) { _, samples, _ in
+                let records = (samples as? [HKWorkout] ?? []).map { w -> WorkoutRecord in
+                    let energy = w.statistics(for: HKQuantityType(.activeEnergyBurned))?
+                        .sumQuantity()?.doubleValue(for: .kilocalorie())
+                    let distance = w.statistics(for: HKQuantityType(.distanceWalkingRunning))?
+                        .sumQuantity()?.doubleValue(for: .mile())
+                    let hr = w.statistics(for: HKQuantityType(.heartRate))?
+                        .averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                    return WorkoutRecord(
+                        start: w.startDate,
+                        type: workoutTypeName(w.workoutActivityType),
+                        durationMin: (w.duration / 60 * 10).rounded() / 10,
+                        energyKcal: energy.map { ($0).rounded() },
+                        distanceMi: distance.map { ($0 * 100).rounded() / 100 },
+                        avgHR: hr.map { ($0).rounded() }
+                    )
+                }
+                continuation.resume(returning: records)
+            }
+            store.execute(query)
+        }
+    }
+
+    private static func workoutTypeName(_ type: HKWorkoutActivityType) -> String {
+        switch type {
+        case .running: "Running"
+        case .walking: "Walking"
+        case .cycling: "Cycling"
+        case .hiking: "Hiking"
+        case .traditionalStrengthTraining: "Strength"
+        case .functionalStrengthTraining: "Functional strength"
+        case .highIntensityIntervalTraining: "HIIT"
+        case .coreTraining: "Core"
+        case .yoga: "Yoga"
+        case .elliptical: "Elliptical"
+        case .rowing: "Rowing"
+        case .swimming: "Swimming"
+        case .stairClimbing, .stairs: "Stairs"
+        case .pilates: "Pilates"
+        case .cooldown: "Cooldown"
+        default: "Other"
+        }
     }
 
     // MARK: - Daily statistics series (Apple Health charts)

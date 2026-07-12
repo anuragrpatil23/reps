@@ -48,6 +48,8 @@ struct TrendsView: View {
                 .tracking(2.2)
                 .foregroundStyle(Palette.graphite)
                 .padding(.top, 8)
+            MetricChartCard(title: "Sleep", unit: "hr",
+                            points: ranged(store.sleepHoursSeries()), stock: Palette.chalk)
             MetricChartCard(title: "Steps", unit: "",
                             points: ranged(store.activitySeries(.steps)), stock: Palette.sage)
             MetricChartCard(title: "Active energy", unit: "kcal",
@@ -56,6 +58,12 @@ struct TrendsView: View {
                             points: ranged(store.activitySeries(.exercise)), stock: Palette.sage)
             MetricChartCard(title: "Resting heart rate", unit: "bpm",
                             points: ranged(store.activitySeries(.restingHR)), stock: Palette.chalk)
+            MetricChartCard(title: "Heart rate variability", unit: "ms",
+                            points: ranged(store.heartSeries("hrv_sdnn")), stock: Palette.chalk)
+            MetricChartCard(title: "Blood oxygen", unit: "%",
+                            points: ranged(store.respiratorySeries("spo2_avg")), stock: Palette.sage)
+            MetricChartCard(title: "VO₂ max", unit: "",
+                            points: ranged(store.heartSeries("vo2max")), stock: Palette.sage)
         }
     }
 

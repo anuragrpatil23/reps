@@ -197,4 +197,24 @@ final class VaultStore {
     func writeActivity(_ activity: [Date: ActivitySummary]) throws {
         try writeText(TelemetryCsv.formatActivity(activity), to: TelemetryCsv.activityPath)
     }
+
+    // MARK: - Curated Apple Health CSVs
+
+    func readHealth(_ path: String, columns: [String]) -> [Date: [String: Double]] {
+        guard let text = readText(path) else { return [:] }
+        return HealthCsv.parse(text, columns: columns)
+    }
+
+    func writeHealth(_ rows: [Date: [String: Double]], columns: [String], to path: String) throws {
+        try writeText(HealthCsv.format(rows, columns: columns), to: path)
+    }
+
+    func readWorkouts() -> [WorkoutRecord] {
+        guard let text = readText(HealthCsv.workoutsPath) else { return [] }
+        return HealthCsv.parseWorkouts(text)
+    }
+
+    func writeWorkouts(_ workouts: [WorkoutRecord]) throws {
+        try writeText(HealthCsv.formatWorkouts(workouts), to: HealthCsv.workoutsPath)
+    }
 }

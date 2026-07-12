@@ -15,7 +15,11 @@ Long-Term-Memory-iCloud/lifeblood_systems/Understanding Myself/Body/
 │   │       └── ...
 │   ├── data/
 │   │   ├── body-composition.csv       ← all weigh-ins (weight/BMI/fat/lean)
-│   │   └── activity.csv               ← daily Apple Watch / Activity history
+│   │   ├── activity.csv               ← daily rings + steps + resting HR
+│   │   ├── heart.csv                  ← daily avg/min/max HR, walking HR, HRV, VO₂max
+│   │   ├── respiratory.csv            ← daily SpO₂, respiratory rate, wrist temp
+│   │   ├── sleep.csv                  ← nightly asleep/in-bed + REM/core/deep/awake
+│   │   └── workouts.csv               ← one row per workout (type/duration/energy/…)
 │   ├── templates/
 │   │   ├── push-a.md                  ← workout templates (sticky defaults)
 │   │   └── ...
@@ -56,7 +60,26 @@ One row per weigh-in day. Empty cells for absent metrics.
 date,steps,resting_hr,move_kcal,move_goal_kcal,exercise_min,exercise_goal_min,stand_hours,stand_goal_hours
 2026-07-10,8934,56,520,500,42,30,11,12
 ```
-One row per day with any Apple Health/Watch activity; full history (~2 years).
+One row per day with any Apple Health/Watch activity.
+
+### Curated Apple Health CSVs (heart / respiratory / sleep / workouts)
+Daily-aggregated (never raw samples — heart rate alone would be millions of
+rows). Full history back to whenever each sensor first recorded (note: SpO₂
+needs Series 6 / late-2020; sleep *stages* + wrist temp need Series 8 / 2022).
+
+```
+# heart.csv
+date,avg_hr,min_hr,max_hr,walking_hr,hrv_sdnn,vo2max
+
+# respiratory.csv
+date,spo2_avg,spo2_min,respiratory_rate,wrist_temp_c
+
+# sleep.csv   (keyed to wake-up date; minutes per stage)
+date,asleep_min,in_bed_min,rem_min,core_min,deep_min,awake_min
+
+# workouts.csv   (one row per workout, not daily)
+start,type,duration_min,energy_kcal,distance_mi,avg_hr
+```
 
 Rules:
 - The app **owns** `log/`, `templates/`, `progress-pics/` — it is the *sole writer* there.

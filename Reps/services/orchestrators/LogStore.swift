@@ -18,6 +18,11 @@ final class LogStore {
     // mirrors we flush whole-file on change; logsByDay is the joined view.
     private var metricsByDay: [Date: BodyMetrics] = [:]
     private var activityByDay: [Date: ActivitySummary] = [:]
+    // Curated Apple Health series (heart.csv / respiratory.csv / sleep.csv) and workouts.
+    private var heartByDay: [Date: [String: Double]] = [:]
+    private var respiratoryByDay: [Date: [String: Double]] = [:]
+    private var sleepByDay: [Date: [String: Double]] = [:]
+    private(set) var workouts: [WorkoutRecord] = []
 
     var vaultConfigured: Bool { vault.isConfigured }
 
@@ -35,6 +40,10 @@ final class LogStore {
         // CSV telemetry wins over any legacy markdown copy.
         metricsByDay = vault.readBodyComposition()
         activityByDay = vault.readActivity()
+        heartByDay = vault.readHealth(HealthCsv.heartPath, columns: HealthCsv.heartColumns)
+        respiratoryByDay = vault.readHealth(HealthCsv.respiratoryPath, columns: HealthCsv.respiratoryColumns)
+        sleepByDay = vault.readHealth(HealthCsv.sleepPath, columns: HealthCsv.sleepColumns)
+        workouts = vault.readWorkouts()
         for (day, log) in docs {
             if metricsByDay[day] == nil, let m = log.metrics { metricsByDay[day] = m }
             if activityByDay[day] == nil, let a = log.activity { activityByDay[day] = a }
@@ -277,15 +286,50 @@ final class LogStore {
             activityChanged = true
         }
 
+        // Curated vitals / sleep / workouts — full history into their CSVs.
+        let days = HealthKitService.fullHistoryDays
+        let heart = await HealthKitService.heartDaily(days: days)
+        let respiratory = await HealthKitService.respiratoryDaily(days: days)
+        let sleep = await HealthKitService.sleepDaily(days: days)
+        let gymWorkouts = await HealthKitService.workoutHistory(days: days)
+
         do {
             if metricsChanged { try vault.writeBodyComposition(metricsByDay) }
             if activityChanged { try vault.writeActivity(activityByDay) }
+            if !heart.isEmpty {
+                heartByDay = heart
+                try vault.writeHealth(heart, columns: HealthCsv.heartColumns, to: HealthCsv.heartPath)
+            }
+            if !respiratory.isEmpty {
+                respiratoryByDay = respiratory
+                try vault.writeHealth(respiratory, columns: HealthCsv.respiratoryColumns, to: HealthCsv.respiratoryPath)
+            }
+            if !sleep.isEmpty {
+                sleepByDay = sleep
+                try vault.writeHealth(sleep, columns: HealthCsv.sleepColumns, to: HealthCsv.sleepPath)
+            }
+            if !gymWorkouts.isEmpty {
+                workouts = gymWorkouts
+                try vault.writeWorkouts(gymWorkouts)
+            }
         } catch {
             lastError = "Couldn't save telemetry: \(error.localizedDescription)"
         }
 
         if metricsChanged || activityChanged { rejoin() }
     }
+
+    /// A daily health column as a chart series (optionally scaled, e.g. min→hr).
+    private func healthSeries(_ source: [Date: [String: Double]], _ column: String, scale: Double = 1) -> [MetricPoint] {
+        source.keys.sorted().compactMap { day in
+            source[day]?[column].map { MetricPoint(date: day, value: ($0 * scale * 10).rounded() / 10) }
+        }
+    }
+
+    func heartSeries(_ column: String) -> [MetricPoint] { healthSeries(heartByDay, column) }
+    func respiratorySeries(_ column: String) -> [MetricPoint] { healthSeries(respiratoryByDay, column) }
+    /// Sleep asleep-time as hours.
+    func sleepHoursSeries() -> [MetricPoint] { healthSeries(sleepByDay, "asleep_min", scale: 1.0 / 60.0) }
 
     /// Rebuild the joined view after telemetry changes (no file reads).
     private func rejoin() {
