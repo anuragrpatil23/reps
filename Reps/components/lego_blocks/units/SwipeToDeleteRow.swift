@@ -1,68 +1,48 @@
 import SwiftUI
 
 /// Swipe-left-to-delete for rows in a custom card "list" (where SwiftUI's
-/// List-only `.swipeActions` isn't available). Swipe reveals a Delete button;
-/// tap it to confirm, or a decisive full swipe deletes outright. Only reacts to
-/// predominantly-horizontal drags so it doesn't fight the vertical scroll.
+/// List-only `.swipeActions` isn't available). As you drag left a red delete
+/// panel grows in from the trailing edge; release past the threshold to delete,
+/// otherwise it snaps back. No row background needed (nothing overlaps at rest),
+/// so it sits seamlessly on the card. Only reacts to predominantly-horizontal
+/// drags so it doesn't fight the vertical scroll.
 struct SwipeToDeleteRow<Content: View>: View {
-    /// Opaque background so the row hides the delete button at rest — pass the
-    /// enclosing card's stock color.
-    let background: Color
     let onDelete: () -> Void
     @ViewBuilder var content: () -> Content
 
-    /// Resting position: 0 = closed, -revealWidth = open.
-    @State private var committed: CGFloat = 0
-    /// Live drag delta while the finger is down.
     @GestureState private var drag: CGFloat = 0
+    private let deleteThreshold: CGFloat = 160
+    private let maxReveal: CGFloat = 96
 
-    private let revealWidth: CGFloat = 84
-    private let deleteThreshold: CGFloat = 200
-
-    private var offset: CGFloat { min(0, max(-revealWidth, committed + drag)) }
+    /// How much of the delete panel is showing (0 at rest).
+    private var reveal: CGFloat { min(maxReveal, max(0, -drag)) }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            Button(role: .destructive) { delete() } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Palette.paper)
-                    .frame(width: revealWidth)
-                    .frame(maxHeight: .infinity)
-                    .background(Palette.madder)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
+        HStack(spacing: 0) {
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(background)
-                .offset(x: offset)
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 14)
-                        .updating($drag) { value, state, _ in
-                            guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                            state = value.translation.width
-                        }
-                        .onEnded { value in
-                            let total = committed + value.translation.width
-                            if -total > deleteThreshold {
-                                delete()               // decisive full swipe
-                            } else {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                    committed = -total > revealWidth / 2 ? -revealWidth : 0
-                                }
-                            }
-                        }
-                )
+            Rectangle()
+                .fill(Palette.madder)
+                .frame(width: reveal)
+                .overlay {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Palette.paper)
+                        .opacity(reveal > 24 ? 1 : 0)
+                }
+                .clipped()
         }
-        .clipped()
-    }
-
-    /// The data change removes the row from the list; reset so a reused view
-    /// starts closed.
-    private func delete() {
-        committed = 0
-        onDelete()
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 14)
+                .updating($drag) { value, state, _ in
+                    guard value.translation.width < 0,
+                          abs(value.translation.width) > abs(value.translation.height) else { return }
+                    state = value.translation.width
+                }
+                .onEnded { value in
+                    if -value.translation.width > deleteThreshold { onDelete() }
+                }
+        )
     }
 }

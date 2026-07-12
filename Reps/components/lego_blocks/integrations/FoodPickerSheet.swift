@@ -88,7 +88,7 @@ private struct ServingEditor: View {
     @State private var servingGrams: Double?
     @FocusState private var focus: Field?
 
-    private enum Field { case weight, grams }
+    private enum Field { case grams }
 
     init(food: Food, onAdd: @escaping (FoodEntry) -> Void) {
         self.food = food
@@ -138,13 +138,8 @@ private struct ServingEditor: View {
                 }
                 .tint(Palette.madder)
 
-                // What one serving weighs — editable, remembered on the food.
-                fieldRow("1 serving weighs", unit: "g", field: .weight) {
-                    TextField("weight", value: $servingGrams, format: .number.precision(.fractionLength(0...1)))
-                        .focused($focus, equals: .weight)
-                }
-
-                // Log by grams, available as soon as a weight is set.
+                // Log by grams — the serving weight comes from the food (or its
+                // serving text); set it when editing the food, not here.
                 if hasWeight {
                     fieldRow("Amount eaten", unit: "g", field: .grams) {
                         TextField("grams", value: gramsBinding, format: .number.precision(.fractionLength(0...1)))
@@ -153,9 +148,6 @@ private struct ServingEditor: View {
                 }
 
                 HStack(spacing: 18) {
-                    if hasWeight {
-                        macro("\(Int((servings * (servingGrams ?? 0)).rounded()))", "g")
-                    }
                     macro("\(Int(scaled.calories.rounded()))", "kcal")
                     macro("\(Int(scaled.proteinG.rounded()))", "P")
                     macro("\(Int(scaled.carbsG.rounded()))", "C")
@@ -182,7 +174,7 @@ private struct ServingEditor: View {
                     Button("Done") { focus = nil }.foregroundStyle(Palette.madder)
                 }
             }
-            .presentationDetents([.height(400)])
+            .presentationDetents([.height(320)])
         }
     }
 

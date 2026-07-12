@@ -238,7 +238,7 @@ struct TodayView: View {
             }
             if let food = log?.food, !food.isEmpty {
                 ForEach(Array(food.enumerated()), id: \.element.id) { index, entry in
-                    SwipeToDeleteRow(background: Palette.butter) {
+                    SwipeToDeleteRow {
                         store.removeFood(entry, on: selectedDay)
                     } content: {
                         HStack(alignment: .firstTextBaseline, spacing: 14) {
