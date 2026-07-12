@@ -69,7 +69,7 @@ enum DailyLogCodec {
     }
 
     private static func exerciseDict(_ e: ExerciseEntry) -> [String: Any] {
-        var d: [String: Any] = ["name": e.name]
+        var d: [String: Any] = ["id": e.id, "name": e.name]
         if let v = e.exerciseId { d["exercise_id"] = v }
         if let sets = e.sets {
             d["sets"] = sets.map { ["reps": $0.reps, "weight_lbs": $0.weightLbs] }
@@ -297,6 +297,7 @@ enum DailyLogCodec {
                 }
             }
             return ExerciseEntry(
+                id: d["id"] as? String ?? UUID().uuidString,
                 name: name, exerciseId: d["exercise_id"] as? String, sets: sets,
                 durationMin: asInt(d["duration_min"]),
                 inclinePct: asDouble(d["incline_pct"]),

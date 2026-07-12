@@ -88,14 +88,16 @@ struct WorkoutEntry: Codable, Sendable {
 }
 
 struct ExerciseEntry: Codable, Identifiable, Sendable {
+    /// Stable identity, independent of the (editable) name — persisted in the
+    /// markdown so SwiftUI diffing and ForEach stay correct across edits and
+    /// launches. Generated fresh for entries decoded from files that predate it.
+    var id: String = UUID().uuidString
     var name: String
     var exerciseId: String?   // reference into the exercise library (exercises.md)
     var sets: [SetEntry]?
     var durationMin: Int?
     var inclinePct: Double?
     var speedMph: Double?
-
-    var id: String { name }
 
     /// Ledger notation: "8×95 8×95 6×100" or "20m @ 12%".
     var notation: String {

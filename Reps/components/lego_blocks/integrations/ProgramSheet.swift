@@ -234,21 +234,19 @@ private struct TemplateEditSheet: View {
                     TextField("Name (e.g. Push A)", text: $title).font(Typo.body)
                 }
 
-                // Keyed by position, not ExerciseEntry.id (which is the name) —
-                // otherwise editing changes a row's identity and drops focus.
-                ForEach(exercises.indices, id: \.self) { index in
+                ForEach($exercises) { $exercise in
                     Section {
                         // Library exercises show their name (fixed); legacy
                         // free-typed rows stay editable.
-                        if exercises[index].exerciseId != nil {
-                            Text(exercises[index].name).font(Typo.body).foregroundStyle(Palette.ink)
+                        if exercise.exerciseId != nil {
+                            Text(exercise.name).font(Typo.body).foregroundStyle(Palette.ink)
                         } else {
-                            TextField("Exercise name", text: $exercises[index].name).font(Typo.body)
+                            TextField("Exercise name", text: $exercise.name).font(Typo.body)
                         }
-                        if exercises[index].sets != nil {
-                            setsEditor($exercises[index])
+                        if exercise.sets != nil {
+                            setsEditor($exercise)
                         } else {
-                            cardioEditor($exercises[index])
+                            cardioEditor($exercise)
                         }
                     }
                 }

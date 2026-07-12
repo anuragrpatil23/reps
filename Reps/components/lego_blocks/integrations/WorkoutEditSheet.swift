@@ -5,6 +5,8 @@ import SwiftUI
 struct WorkoutEditSheet: View {
     @State var draft: WorkoutEntry
     let onSave: (WorkoutEntry) -> Void
+    @Environment(LogStore.self) private var store
+    @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
     @FocusState private var editing: Bool
 
@@ -12,9 +14,9 @@ struct WorkoutEditSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    ForEach(draft.exercises.indices, id: \.self) { index in
-                        exerciseEditor($draft.exercises[index]) {
-                            draft.exercises.remove(at: index)
+                    ForEach($draft.exercises) { $exercise in
+                        exerciseEditor($exercise) {
+                            draft.exercises.removeAll { $0.id == exercise.id }
                         }
                     }
                 }
@@ -55,13 +57,23 @@ struct WorkoutEditSheet: View {
         }
     }
 
-    @ViewBuilder
     private func exerciseEditor(_ exercise: Binding<ExerciseEntry>, onRemove: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Resolve the library entry so the edit sheet carries the same cue and
+        // how-to link the day-page card shows — one world, not two.
+        let library = store.exercise(exercise.wrappedValue.exerciseId)
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(exercise.wrappedValue.name)
                     .font(Typo.display)
                     .foregroundStyle(Palette.ink)
+                if let link = library?.links.first {
+                    Button {
+                        if let url = URL(string: link.url) { openURL(url) }
+                    } label: {
+                        Image(systemName: "play.circle").font(.footnote).foregroundStyle(Palette.madder)
+                    }
+                    .buttonStyle(.plain)
+                }
                 Spacer()
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "trash")
@@ -71,8 +83,11 @@ struct WorkoutEditSheet: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Remove exercise")
             }
+            if let cue = library?.cue, !cue.isEmpty {
+                Text(cue).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+            }
             if exercise.wrappedValue.sets != nil {
-                setsEditor(exercise)
+                setsEditor(exercise, library: library)
             } else {
                 cardioEditor(exercise)
             }
@@ -80,7 +95,7 @@ struct WorkoutEditSheet: View {
         .flatCard(Palette.chalk)
     }
 
-    private func setsEditor(_ exercise: Binding<ExerciseEntry>) -> some View {
+    private func setsEditor(_ exercise: Binding<ExerciseEntry>, library: Exercise?) -> some View {
         VStack(spacing: 8) {
             ForEach(Array((exercise.wrappedValue.sets ?? []).indices), id: \.self) { index in
                 HStack(spacing: 12) {
@@ -112,7 +127,12 @@ struct WorkoutEditSheet: View {
             }
             HStack {
                 Button {
-                    let last = exercise.wrappedValue.sets?.last ?? SetEntry(reps: 8, weightLbs: 0)
+                    // Copy the last set, else fall back to the library defaults.
+                    let fallback = SetEntry(
+                        reps: library?.defaultReps ?? 10,
+                        weightLbs: library?.defaultWeight(for: .current) ?? 0
+                    )
+                    let last = exercise.wrappedValue.sets?.last ?? fallback
                     exercise.wrappedValue.sets?.append(last)
                 } label: {
                     Label("Add set", systemImage: "plus")
