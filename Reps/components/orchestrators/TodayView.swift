@@ -238,36 +238,32 @@ struct TodayView: View {
             }
             if let food = log?.food, !food.isEmpty {
                 ForEach(Array(food.enumerated()), id: \.element.id) { index, entry in
-                    SwipeToDeleteRow {
-                        store.removeFood(entry, on: selectedDay)
-                    } content: {
-                        HStack(alignment: .firstTextBaseline, spacing: 14) {
-                            Text(entry.at)
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        Text(entry.at)
+                            .font(Typo.mono)
+                            .foregroundStyle(Palette.graphite)
+                        Text(foodLabel(entry))
+                            .font(Typo.body)
+                            .foregroundStyle(Palette.ink)
+                        Spacer(minLength: 0)
+                        if let m = store.macros(for: entry) {
+                            Text("\(Int(m.calories.rounded()))")
                                 .font(Typo.mono)
                                 .foregroundStyle(Palette.graphite)
-                            Text(foodLabel(entry))
-                                .font(Typo.body)
-                                .foregroundStyle(Palette.ink)
-                            Spacer(minLength: 0)
-                            if let m = store.macros(for: entry) {
-                                Text("\(Int(m.calories.rounded()))")
-                                    .font(Typo.mono)
-                                    .foregroundStyle(Palette.graphite)
-                            }
                         }
-                        .padding(.vertical, 9)
-                        .contentShape(Rectangle())
-                        .overlay(alignment: .bottom) {
-                            if index < food.count - 1 {
-                                Rectangle().fill(Palette.hairline).frame(height: 0.5)
-                            }
+                    }
+                    .padding(.vertical, 9)
+                    .contentShape(Rectangle())
+                    .overlay(alignment: .bottom) {
+                        if index < food.count - 1 {
+                            Rectangle().fill(Palette.hairline).frame(height: 0.5)
                         }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                store.removeFood(entry, on: selectedDay)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            store.removeFood(entry, on: selectedDay)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
                 }

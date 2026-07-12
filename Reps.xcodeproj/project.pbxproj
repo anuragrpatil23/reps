@@ -22,7 +22,6 @@
 		3F9A5A44142EA31F7FCDA425 /* WorkoutCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC07DB60192B1A3606EE31E6 /* WorkoutCardView.swift */; };
 		5220DABC90DE1923C100F3FF /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42675A128AA8DEC80995D56F /* TodayView.swift */; };
 		54A0B1077F1729898F2F03FA /* HealthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F395D46DD53EE7950B2F38 /* HealthModels.swift */; };
-		57CAAA2631273BABF72CD478 /* SwipeToDeleteRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B0A784C61514C592134F685 /* SwipeToDeleteRow.swift */; };
 		65FB1C7702EA97F27D29B9E4 /* WorkoutTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2695EEFFCE3210F482CF6AE8 /* WorkoutTemplate.swift */; };
 		6DF0940BA81E5FBB2BD169A7 /* SpineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DEC68721663F7EB7FED7AC /* SpineView.swift */; };
 		6F44E40B56EC12629B050011 /* SleepStagesChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4133AD1A9670E02221A403C /* SleepStagesChartCard.swift */; };
@@ -56,7 +55,6 @@
 		2695EEFFCE3210F482CF6AE8 /* WorkoutTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutTemplate.swift; sourceTree = "<group>"; };
 		2E80CDB9D456BC120E341A4E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F905AEACE075CD2694EBD56 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
-		3B0A784C61514C592134F685 /* SwipeToDeleteRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDeleteRow.swift; sourceTree = "<group>"; };
 		42675A128AA8DEC80995D56F /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		4481173DDF7051796807C8BA /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		4C2973D69DE684E7C4D4CBEF /* FoodPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodPickerSheet.swift; sourceTree = "<group>"; };
@@ -69,7 +67,7 @@
 		832F355815BE65D37AC75ADD /* TextRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextRecognizer.swift; sourceTree = "<group>"; };
 		87BB2EA03BDC0B4E1DC50187 /* ProgramSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramSheet.swift; sourceTree = "<group>"; };
 		89F73E9CB8B46A571B9DEA48 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		96114FC25C27FF8DCD3EE27E /* CameraCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCapture.swift; sourceTree = "<group>"; };
 		9BD9441032E3217E1825CD6A /* DailyLogCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyLogCodec.swift; sourceTree = "<group>"; };
 		9E7CFB00FD9C73D6C69A9B40 /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
@@ -120,7 +118,6 @@
 				610FE7A2A812E25DD6CC3DAC /* MetricChartCard.swift */,
 				B4133AD1A9670E02221A403C /* SleepStagesChartCard.swift */,
 				A2DEC68721663F7EB7FED7AC /* SpineView.swift */,
-				3B0A784C61514C592134F685 /* SwipeToDeleteRow.swift */,
 				4481173DDF7051796807C8BA /* Theme.swift */,
 				CC07DB60192B1A3606EE31E6 /* WorkoutCardView.swift */,
 			);
@@ -352,7 +349,6 @@
 				0847CBC2611ADABB9AAD9A88 /* SettingsSheet.swift in Sources */,
 				6F44E40B56EC12629B050011 /* SleepStagesChartCard.swift in Sources */,
 				6DF0940BA81E5FBB2BD169A7 /* SpineView.swift in Sources */,
-				57CAAA2631273BABF72CD478 /* SwipeToDeleteRow.swift in Sources */,
 				312892774299B0F638DBEB3A /* TelemetryCsv.swift in Sources */,
 				0706082E7DE30BB7BB33D032 /* TextRecognizer.swift in Sources */,
 				2E742BE8EEA2B45FB47DC37D /* Theme.swift in Sources */,
@@ -376,7 +372,6 @@
 				CODE_SIGN_ENTITLEMENTS = Reps/Reps.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2LWQ9LQUGT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Reps/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -519,7 +514,6 @@
 				CODE_SIGN_ENTITLEMENTS = Reps/Reps.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2LWQ9LQUGT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Reps/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
