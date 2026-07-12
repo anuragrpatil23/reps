@@ -96,6 +96,17 @@ final class VaultStore {
         }
     }
 
+    /// Remove a day's markdown file (used by cleanup once its telemetry is
+    /// safely in the CSVs). No-op if the file isn't there.
+    func deleteLog(for date: Date) throws {
+        _ = try withAccess { root in
+            let url = logURL(for: date, root: root)
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
     /// All day-dates that have a log file on disk.
     func listLogDates() -> [Date] {
         withAccess { root in

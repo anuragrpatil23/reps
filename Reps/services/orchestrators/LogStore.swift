@@ -298,6 +298,50 @@ final class LogStore {
         }
     }
 
+    // MARK: - Cleanup (one-time migration of pre-split daily files)
+
+    /// Result of the last cleanup run, for the Settings status line.
+    var cleanupSummary: String?
+
+    /// Migrate legacy daily markdown: telemetry is flushed to the CSVs first
+    /// (no data loss), then every `.md` is either rewritten without its
+    /// metrics/activity frontmatter (if it has workout/food/pics/note) or
+    /// deleted (if it held only telemetry). Explicit, never automatic.
+    func cleanupDailyDocs() {
+        guard vaultConfigured else { return }
+        do {
+            try vault.writeBodyComposition(metricsByDay)
+            try vault.writeActivity(activityByDay)
+        } catch {
+            lastError = "Couldn't write telemetry before cleanup: \(error.localizedDescription)"
+            return
+        }
+
+        var deleted = 0
+        var rewritten = 0
+        for day in vault.listLogDates().map({ Calendar.current.startOfDay(for: $0) }) {
+            let log = logsByDay[day] ?? DailyLog(date: day)
+            let hasJournal = log.workout != nil || !log.food.isEmpty
+                || !log.pics.isEmpty || (log.note?.isEmpty == false)
+            do {
+                if hasJournal {
+                    writeDoc(log)                 // rewrites without telemetry keys
+                    rewritten += 1
+                } else {
+                    try vault.deleteLog(for: day) // data is safe in the CSVs
+                    var joined = DailyLog(date: day)
+                    joined.metrics = metricsByDay[day]
+                    joined.activity = activityByDay[day]
+                    logsByDay[day] = joined
+                    deleted += 1
+                }
+            } catch {
+                lastError = "Cleanup failed on \(DailyLogCodec.dayString(day)): \(error.localizedDescription)"
+            }
+        }
+        cleanupSummary = "Removed \(deleted) telemetry-only files, kept \(rewritten) notes."
+    }
+
     // MARK: - Activity series (for the Trends Apple Health charts)
 
     func activitySeries(_ kind: ActivityKind) -> [MetricPoint] {

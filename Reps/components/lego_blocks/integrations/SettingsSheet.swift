@@ -66,8 +66,15 @@ struct SettingsSheet: View {
                 Section {
                     Button("Rescan vault") { store.load() }
                         .foregroundStyle(Palette.ink)
+                    Button("Clean up daily notes") { store.cleanupDailyDocs() }
+                        .foregroundStyle(Palette.madder)
+                    if let summary = store.cleanupSummary {
+                        Text(summary)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.graphite)
+                    }
                 } footer: {
-                    Text("The vault files are the source of truth — rescanning rebuilds everything the app shows.")
+                    Text("The vault files are the source of truth — rescanning rebuilds everything the app shows. Clean up moves weight/activity into the CSVs and removes old telemetry-only daily files (your notes and workouts are kept).")
                 }
                 if let error = store.lastError {
                     Section("Last error") {
