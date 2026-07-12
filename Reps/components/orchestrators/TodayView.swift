@@ -6,7 +6,9 @@ struct TodayView: View {
     @Environment(LogStore.self) private var store
     @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
     @State private var showingWorkoutSheet = false
+    @State private var addingWorkoutExercise = false
     @State private var showingFoodSheet = false
+    @State private var editingFood: FoodEntry?
     @State private var showingSettings = false
     @State private var photoItem: PhotosPickerItem?
     @State private var pendingPhoto: Data?
@@ -14,6 +16,7 @@ struct TodayView: View {
     @State private var picViewer: ProgressPicContext?
     @State private var picsUnlocked = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     /// Target body-fat %, a personal preference (0 = unset). Shared with Settings.
     @AppStorage("reps.targetBodyFatPct") private var targetBodyFatPct = 0.0
@@ -115,6 +118,18 @@ struct TodayView: View {
         .sheet(isPresented: $showingFoodSheet) {
             FoodPickerSheet { entry in
                 store.addFood(entry, on: selectedDay)
+            }
+        }
+        .sheet(isPresented: $addingWorkoutExercise) {
+            ExercisePickerSheet { exercise in
+                store.logExercise(loggableEntry(for: exercise), on: selectedDay)
+            }
+        }
+        .sheet(item: $editingFood) { entry in
+            if let id = entry.foodId, let food = store.food(id) {
+                ServingEditor(food: food, editing: entry) { updated in
+                    store.updateFood(updated, on: selectedDay)
+                }
             }
         }
         .sheet(isPresented: $showingSettings) {
@@ -260,23 +275,166 @@ struct TodayView: View {
 
     @ViewBuilder
     private var workoutSection: some View {
-        let workout = log?.workout ?? store.stickyWorkout(for: selectedDay)
-        if workout.status == .rest {
-            HStack {
-                Text("Rest day")
-                    .font(Typo.display)
-                    .foregroundStyle(Palette.graphite)
-                Spacer()
+        let planned = store.stickyWorkout(for: selectedDay)
+        let logged = log?.workout?.exercises ?? []
+        let suggestions = store.suggestedExercises(for: selectedDay)
+        // Explicitly marked rest, or a scheduled rest day left untouched.
+        let markedRest = log?.workout?.status == .rest
+        let isRest = markedRest || (planned.status == .rest && log?.workout == nil)
+
+        if isRest {
+            Menu {
+                Button { addingWorkoutExercise = true } label: {
+                    Label("Add exercise anyway", systemImage: "plus")
+                }
+                if markedRest {
+                    Button { store.clearWorkout(on: selectedDay) } label: {
+                        Label("Not a rest day", systemImage: "arrow.uturn.backward")
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Rest day")
+                        .font(Typo.display)
+                        .foregroundStyle(Palette.graphite)
+                    Spacer()
+                }
+                .cardStock(Palette.chalk)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    sectionHeader("Workout")
+                    Spacer()
+                    Menu {
+                        Button { addingWorkoutExercise = true } label: {
+                            Label("Add exercise", systemImage: "plus")
+                        }
+                        Button {
+                            store.saveWorkout(WorkoutEntry(status: .rest), on: selectedDay)
+                        } label: {
+                            Label("Mark as rest day", systemImage: "moon.zzz")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Palette.madder)
+                    }
+                    .accessibilityLabel("Add exercise or mark rest")
+                }
+
+                // Logged exercises (solid). Any row opens the all-together edit.
+                if !logged.isEmpty {
+                    ForEach(Array(logged.enumerated()), id: \.offset) { index, exercise in
+                        Button {
+                            showingWorkoutSheet = true
+                        } label: {
+                            exerciseRow(exercise, faint: false, divider: index < logged.count - 1)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else if suggestions.isEmpty {
+                    emptyLine("No exercises yet.")
+                }
+
+                // Suggestions from the scheduled workout (faint): Log all + per-row +.
+                if !suggestions.isEmpty {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Suggested · \(planned.title ?? planned.template ?? "plan")")
+                            .font(Typo.monoSmall)
+                            .foregroundStyle(Palette.graphite)
+                        Spacer()
+                        Button {
+                            store.logAllSuggested(on: selectedDay)
+                        } label: {
+                            Text("Log all").font(Typo.monoSmall).foregroundStyle(Palette.madder)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 12)
+                    .padding(.bottom, 2)
+                    ForEach(Array(suggestions.enumerated()), id: \.offset) { _, exercise in
+                        Button {
+                            store.logExercise(exercise, on: selectedDay)
+                        } label: {
+                            suggestionRow(exercise)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .cardStock(Palette.chalk)
-        } else {
-            Button {
-                showingWorkoutSheet = true
-            } label: {
-                WorkoutCardView(workout: workout)
-            }
-            .buttonStyle(.plain)
         }
+    }
+
+    /// A logged exercise row — name · notation, with an optional how-to glyph.
+    private func exerciseRow(_ exercise: ExerciseEntry, faint: Bool, divider: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(exercise.name)
+                .font(Typo.body)
+                .foregroundStyle(faint ? Palette.graphite : Palette.ink)
+            if let link = firstLink(for: exercise) { linkGlyph(link) }
+            Spacer(minLength: 12)
+            Text(exercise.notation)
+                .font(Typo.mono)
+                .foregroundStyle(Palette.graphite)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            if divider { Rectangle().fill(Palette.hairline).frame(height: 0.5) }
+        }
+    }
+
+    /// A suggested (not-yet-logged) exercise — faint, with a leading + to log it.
+    private func suggestionRow(_ exercise: ExerciseEntry) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "plus.circle")
+                .font(.system(size: 13))
+                .foregroundStyle(Palette.madder)
+            Text(exercise.name)
+                .font(Typo.body)
+                .foregroundStyle(Palette.graphite)
+            if let link = firstLink(for: exercise) { linkGlyph(link) }
+            Spacer(minLength: 12)
+            Text(exercise.notation)
+                .font(Typo.mono)
+                .foregroundStyle(Palette.graphite)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
+    }
+
+    /// Tap-to-open how-to link glyph.
+    @ViewBuilder
+    private func linkGlyph(_ link: ExerciseLink) -> some View {
+        Button {
+            if let url = URL(string: link.url) { openURL(url) }
+        } label: {
+            Image(systemName: "play.circle")
+                .font(.footnote)
+                .foregroundStyle(Palette.madder)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The first how-to link for a workout exercise, resolved from the library.
+    private func firstLink(for exercise: ExerciseEntry) -> ExerciseLink? {
+        store.exercise(exercise.exerciseId)?.links.first
+    }
+
+    /// Build a loggable entry for a library exercise picked from the header +.
+    private func loggableEntry(for exercise: Exercise) -> ExerciseEntry {
+        guard exercise.muscle != "cardio" else {
+            return ExerciseEntry(name: exercise.name, exerciseId: exercise.key, durationMin: 20)
+        }
+        let set = SetEntry(reps: exercise.defaultReps, weightLbs: exercise.defaultWeight(for: Sex.current))
+        return ExerciseEntry(name: exercise.name, exerciseId: exercise.key,
+                             sets: Array(repeating: set, count: 3))
     }
 
     // MARK: food
@@ -298,28 +456,41 @@ struct TodayView: View {
             }
             if let food = log?.food, !food.isEmpty {
                 ForEach(Array(food.enumerated()), id: \.element.id) { index, entry in
-                    HStack(alignment: .firstTextBaseline, spacing: 14) {
-                        Text(entry.at)
-                            .font(Typo.mono)
-                            .foregroundStyle(Palette.graphite)
-                        Text(foodLabel(entry))
-                            .font(Typo.body)
-                            .foregroundStyle(Palette.ink)
-                        Spacer(minLength: 0)
-                        if let m = store.macros(for: entry) {
-                            Text("\(Int(m.calories.rounded()))")
+                    Button {
+                        // Only DB foods have servings to scale; free text/photos don't.
+                        if entry.foodId != nil { editingFood = entry }
+                    } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 14) {
+                            Text(entry.at)
                                 .font(Typo.mono)
                                 .foregroundStyle(Palette.graphite)
+                            Text(foodLabel(entry))
+                                .font(Typo.body)
+                                .foregroundStyle(Palette.ink)
+                            Spacer(minLength: 0)
+                            if let m = store.macros(for: entry) {
+                                Text("\(Int(m.calories.rounded()))")
+                                    .font(Typo.mono)
+                                    .foregroundStyle(Palette.graphite)
+                            }
                         }
+                        .padding(.vertical, 9)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 9)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                     .overlay(alignment: .bottom) {
                         if index < food.count - 1 {
                             Rectangle().fill(Palette.hairline).frame(height: 0.5)
                         }
                     }
                     .contextMenu {
+                        if entry.foodId != nil {
+                            Button {
+                                editingFood = entry
+                            } label: {
+                                Label("Edit servings", systemImage: "slider.horizontal.3")
+                            }
+                        }
                         Button(role: .destructive) {
                             store.removeFood(entry, on: selectedDay)
                         } label: {

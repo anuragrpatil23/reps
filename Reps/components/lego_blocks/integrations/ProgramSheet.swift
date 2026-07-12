@@ -225,6 +225,7 @@ private struct TemplateEditSheet: View {
 
     @State private var title = ""
     @State private var exercises: [ExerciseEntry] = []
+    @State private var addingExercise = false
 
     var body: some View {
         NavigationStack {
@@ -233,24 +234,29 @@ private struct TemplateEditSheet: View {
                     TextField("Name (e.g. Push A)", text: $title).font(Typo.body)
                 }
 
-                ForEach($exercises) { $exercise in
+                // Keyed by position, not ExerciseEntry.id (which is the name) —
+                // otherwise editing changes a row's identity and drops focus.
+                ForEach(exercises.indices, id: \.self) { index in
                     Section {
-                        TextField("Exercise name", text: $exercise.name).font(Typo.body)
-                        if exercise.sets != nil {
-                            setsEditor($exercise)
+                        // Library exercises show their name (fixed); legacy
+                        // free-typed rows stay editable.
+                        if exercises[index].exerciseId != nil {
+                            Text(exercises[index].name).font(Typo.body).foregroundStyle(Palette.ink)
                         } else {
-                            cardioEditor($exercise)
+                            TextField("Exercise name", text: $exercises[index].name).font(Typo.body)
+                        }
+                        if exercises[index].sets != nil {
+                            setsEditor($exercises[index])
+                        } else {
+                            cardioEditor($exercises[index])
                         }
                     }
                 }
                 .onDelete { exercises.remove(atOffsets: $0) }
 
                 Section {
-                    Button { exercises.append(ExerciseEntry(name: "", sets: [SetEntry(reps: 8, weightLbs: 0)])) } label: {
-                        Label("Add strength exercise", systemImage: "plus").foregroundStyle(Palette.madder)
-                    }
-                    Button { exercises.append(ExerciseEntry(name: "", durationMin: 20)) } label: {
-                        Label("Add cardio", systemImage: "plus").foregroundStyle(Palette.madder)
+                    Button { addingExercise = true } label: {
+                        Label("Add exercise", systemImage: "plus").foregroundStyle(Palette.madder)
                     }
                 }
             }
@@ -268,8 +274,25 @@ private struct TemplateEditSheet: View {
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
+            .sheet(isPresented: $addingExercise) {
+                ExercisePickerSheet { exercise in addPicked(exercise) }
+            }
             .onAppear { if let editing { title = editing.title; exercises = editing.exercises } }
         }
+    }
+
+    /// Append a library exercise, defaulting to a duration entry for cardio and
+    /// a sets entry otherwise — the muscle group tells us how it's logged.
+    private func addPicked(_ exercise: Exercise) {
+        let entry: ExerciseEntry
+        if exercise.muscle == "cardio" {
+            entry = ExerciseEntry(name: exercise.name, exerciseId: exercise.key, durationMin: 20)
+        } else {
+            let set = SetEntry(reps: exercise.defaultReps, weightLbs: exercise.defaultWeight(for: Sex.current))
+            entry = ExerciseEntry(name: exercise.name, exerciseId: exercise.key,
+                                  sets: Array(repeating: set, count: 3))
+        }
+        exercises.append(entry)
     }
 
     private func setsEditor(_ exercise: Binding<ExerciseEntry>) -> some View {

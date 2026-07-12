@@ -7,9 +7,11 @@ struct SettingsSheet: View {
     @State private var showingFolderPicker = false
     @State private var healthStatus: String?
     @State private var showingProgram = false
+    @State private var showingExercises = false
     @State private var showingMealPlan = false
     @AppStorage("reps.targetBodyFatPct") private var targetBodyFatPct = 0.0
     @AppStorage("reps.lockPhotos") private var lockPhotos = true
+    @AppStorage("reps.sex") private var sexRaw = Sex.male.rawValue
 
     // Energy & macro knobs. Every field is editable; the defaults produce the
     // auto-suggested targets (baseline 0 = compute from lean mass).
@@ -33,10 +35,21 @@ struct SettingsSheet: View {
                             Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Palette.hairline)
                         }
                     }
+                    Button {
+                        showingExercises = true
+                    } label: {
+                        HStack {
+                            Text("Exercise library").font(Typo.body).foregroundStyle(Palette.ink)
+                            Spacer()
+                            Text("\(store.exercises.count)")
+                                .font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Palette.hairline)
+                        }
+                    }
                 } header: {
                     Text("Training")
                 } footer: {
-                    Text("Set up your workouts and the weekly rotation that schedules them.")
+                    Text("Set up your workouts and the weekly rotation that schedules them. Exercises carry form cues and how-to links.")
                 }
 
                 Section {
@@ -55,6 +68,20 @@ struct SettingsSheet: View {
                     Text("Nutrition")
                 } footer: {
                     Text("Your daily staples — the meals that don't change — pre-filled for one-tap logging.")
+                }
+
+                Section {
+                    Picker(selection: $sexRaw) {
+                        ForEach(Sex.allCases) { Text($0.label).tag($0.rawValue) }
+                    } label: {
+                        Text("Sex").font(Typo.body).foregroundStyle(Palette.ink)
+                    }
+                    .pickerStyle(.menu)
+                    .tint(Palette.madder)
+                } header: {
+                    Text("Profile")
+                } footer: {
+                    Text("Sets the default starting weights when you add an exercise to a workout.")
                 }
 
                 Section {
@@ -189,6 +216,7 @@ struct SettingsSheet: View {
                 }
             }
             .sheet(isPresented: $showingProgram) { ProgramSheet() }
+            .sheet(isPresented: $showingExercises) { ExerciseLibrarySheet() }
             .sheet(isPresented: $showingMealPlan) { MealPlanSheet() }
         }
     }

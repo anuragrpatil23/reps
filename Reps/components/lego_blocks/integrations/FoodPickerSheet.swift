@@ -88,21 +88,27 @@ struct FoodPickerSheet: View {
 /// Choose the amount, preview the scaled macros, add to the day. Set what one
 /// serving weighs and you can log by grams — enter "150 g" and the app works out
 /// the serving fraction for you. The weight is remembered on the food.
-private struct ServingEditor: View {
+///
+/// Reused to edit an already-logged entry: pass `editing` to pre-fill its
+/// servings and keep its time, so `onAdd` yields an updated entry (same id).
+struct ServingEditor: View {
     @Environment(LogStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     let food: Food
+    let editing: FoodEntry?
     let onAdd: (FoodEntry) -> Void
 
-    @State private var servings = 1.0
+    @State private var servings: Double
     @State private var servingGrams: Double?
     @FocusState private var focus: Field?
 
     private enum Field { case grams, pieces }
 
-    init(food: Food, onAdd: @escaping (FoodEntry) -> Void) {
+    init(food: Food, editing: FoodEntry? = nil, onAdd: @escaping (FoodEntry) -> Void) {
         self.food = food
+        self.editing = editing
         self.onAdd = onAdd
+        _servings = State(initialValue: editing?.servings ?? 1)
         // Fall back to a gram weight embedded in the serving text ("4 oz (112g)").
         _servingGrams = State(initialValue: food.servingGrams ?? Self.gramsInText(food.servingDesc))
     }
@@ -192,7 +198,7 @@ private struct ServingEditor: View {
                     Button("Cancel") { dismiss() }.foregroundStyle(Palette.graphite)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { add() }
+                    Button(editing == nil ? "Add" : "Save") { add() }
                         .fontWeight(.semibold)
                         .foregroundStyle(Palette.madder)
                 }
@@ -231,7 +237,8 @@ private struct ServingEditor: View {
             updated.servingGrams = servingGrams
             store.saveFood(updated)
         }
-        let at = Date().formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+        // Keep the entry's original time when editing; stamp now when adding.
+        let at = editing?.at ?? Date().formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
         onAdd(FoodEntry(at: at, text: food.name, foodId: food.id, servings: servings))
         dismiss()
     }

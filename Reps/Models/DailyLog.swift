@@ -89,6 +89,7 @@ struct WorkoutEntry: Codable, Sendable {
 
 struct ExerciseEntry: Codable, Identifiable, Sendable {
     var name: String
+    var exerciseId: String?   // reference into the exercise library (exercises.md)
     var sets: [SetEntry]?
     var durationMin: Int?
     var inclinePct: Double?

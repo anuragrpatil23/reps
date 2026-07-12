@@ -12,8 +12,10 @@ struct WorkoutEditSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    ForEach($draft.exercises) { $exercise in
-                        exerciseEditor($exercise)
+                    ForEach(draft.exercises.indices, id: \.self) { index in
+                        exerciseEditor($draft.exercises[index]) {
+                            draft.exercises.remove(at: index)
+                        }
                     }
                 }
                 .padding(20)
@@ -54,11 +56,21 @@ struct WorkoutEditSheet: View {
     }
 
     @ViewBuilder
-    private func exerciseEditor(_ exercise: Binding<ExerciseEntry>) -> some View {
+    private func exerciseEditor(_ exercise: Binding<ExerciseEntry>, onRemove: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(exercise.wrappedValue.name)
-                .font(Typo.display)
-                .foregroundStyle(Palette.ink)
+            HStack(alignment: .firstTextBaseline) {
+                Text(exercise.wrappedValue.name)
+                    .font(Typo.display)
+                    .foregroundStyle(Palette.ink)
+                Spacer()
+                Button(role: .destructive, action: onRemove) {
+                    Image(systemName: "trash")
+                        .font(.footnote)
+                        .foregroundStyle(Palette.graphite)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove exercise")
+            }
             if exercise.wrappedValue.sets != nil {
                 setsEditor(exercise)
             } else {

@@ -70,6 +70,7 @@ enum DailyLogCodec {
 
     private static func exerciseDict(_ e: ExerciseEntry) -> [String: Any] {
         var d: [String: Any] = ["name": e.name]
+        if let v = e.exerciseId { d["exercise_id"] = v }
         if let sets = e.sets {
             d["sets"] = sets.map { ["reps": $0.reps, "weight_lbs": $0.weightLbs] }
         }
@@ -241,6 +242,47 @@ enum DailyLogCodec {
                          servings: asDouble(d["servings"]))
     }
 
+    // MARK: - Exercise library (sffit/exercises.md)
+
+    static func exerciseLibraryMarkdown(for exercises: [Exercise]) throws -> String {
+        let list: [[String: Any]] = exercises.map { ex in
+            var d: [String: Any] = ["key": ex.key, "name": ex.name, "muscle": ex.muscle,
+                                    "default_reps": ex.defaultReps]
+            if let cue = ex.cue, !cue.isEmpty { d["cue"] = cue }
+            if ex.defaultWeightMale > 0 { d["default_weight_male"] = ex.defaultWeightMale }
+            if ex.defaultWeightFemale > 0 { d["default_weight_female"] = ex.defaultWeightFemale }
+            if !ex.links.isEmpty {
+                d["links"] = ex.links.map { ["label": $0.label, "url": $0.url] }
+            }
+            return d
+        }
+        let fm: [String: Any] = [
+            "schema_version": schemaVersion,
+            "type": "sffit-exercise-library",
+            "exercises": list,
+        ]
+        let yaml = try Yams.dump(object: fm, sortKeys: true)
+        return "---\n\(yaml)---\n"
+    }
+
+    static func parseExerciseLibrary(_ text: String) -> [Exercise]? {
+        guard let (fm, _) = splitFrontmatter(text),
+              fm["type"] as? String == "sffit-exercise-library" else { return nil }
+        let list = fm["exercises"] as? [[String: Any]] ?? []
+        return list.compactMap { d in
+            guard let key = d["key"] as? String, let name = d["name"] as? String else { return nil }
+            let links = (d["links"] as? [[String: Any]])?.compactMap { l -> ExerciseLink? in
+                guard let url = l["url"] as? String else { return nil }
+                return ExerciseLink(label: l["label"] as? String ?? "Link", url: url)
+            } ?? []
+            return Exercise(key: key, name: name, muscle: d["muscle"] as? String ?? "other",
+                            cue: (d["cue"] as? String).flatMap { $0.isEmpty ? nil : $0 }, links: links,
+                            defaultReps: asInt(d["default_reps"]) ?? 10,
+                            defaultWeightMale: asDouble(d["default_weight_male"]) ?? 0,
+                            defaultWeightFemale: asDouble(d["default_weight_female"]) ?? 0)
+        }
+    }
+
     // MARK: - Shared plumbing
 
     private static func parseExercises(_ raw: Any?) -> [ExerciseEntry] {
@@ -255,7 +297,7 @@ enum DailyLogCodec {
                 }
             }
             return ExerciseEntry(
-                name: name, sets: sets,
+                name: name, exerciseId: d["exercise_id"] as? String, sets: sets,
                 durationMin: asInt(d["duration_min"]),
                 inclinePct: asDouble(d["incline_pct"]),
                 speedMph: asDouble(d["speed_mph"])

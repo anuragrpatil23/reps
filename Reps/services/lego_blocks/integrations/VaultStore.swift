@@ -226,6 +226,18 @@ final class VaultStore {
         }
     }
 
+    // MARK: - Exercise library (single file)
+
+    func readExercises() -> [Exercise] {
+        guard let text = readText("sffit/exercises.md") else { return [] }
+        return DailyLogCodec.parseExerciseLibrary(text) ?? []
+    }
+
+    func writeExercises(_ exercises: [Exercise]) throws {
+        let text = try DailyLogCodec.exerciseLibraryMarkdown(for: exercises)
+        try writeText(text, to: "sffit/exercises.md")
+    }
+
     // MARK: - Progress pics
 
     /// Saves JPEG data and returns the vault-relative path for the log entry.

@@ -13,6 +13,7 @@ final class LogStore {
     private(set) var templates: [WorkoutTemplate] = []
     private(set) var programs: [Program] = []
     private(set) var mealPlans: [MealPlan] = []
+    private(set) var exercises: [Exercise] = []
     private(set) var foods: [Food] = []
     private(set) var loaded = false
     var lastError: String?
@@ -92,6 +93,17 @@ final class LogStore {
         templates = fromVault.isEmpty ? [.builtinPushA] : fromVault
         programs = vault.readPrograms()
         mealPlans = vault.readMealPlans()
+        // The vault's exercises.md is the source of truth. Only when it's absent
+        // do we seed it once from the in-app defaults (Exercise.builtins) — this
+        // creates the file the AI trainer edits and the UI reads. After that the
+        // vault wins; deletions/edits are never overwritten or re-seeded.
+        var library = vault.readExercises()
+        if library.isEmpty {
+            library = Exercise.builtins
+            try? vault.writeExercises(library)
+        }
+        exercises = library
+        rebuildExerciseIndex()
         foods = vault.readFoods()
         rebuildFoodIndex()
         loaded = true
@@ -140,6 +152,45 @@ final class LogStore {
         var n = 2
         while taken("\(base)-\(n)") { n += 1 }
         return "\(base)-\(n)"
+    }
+
+    // MARK: - Exercise library
+
+    private var exercisesByKey: [String: Exercise] = [:]
+
+    func exercise(_ key: String?) -> Exercise? {
+        guard let key else { return nil }
+        return exercisesByKey[key]
+    }
+
+    private func rebuildExerciseIndex() {
+        exercisesByKey = Dictionary(exercises.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func uniqueExerciseKey(for name: String) -> String {
+        uniqueKey(for: name) { key in exercisesByKey[key] != nil }
+    }
+
+    func saveExercise(_ exercise: Exercise) {
+        if let index = exercises.firstIndex(where: { $0.key == exercise.key }) {
+            exercises[index] = exercise
+        } else {
+            exercises.append(exercise)
+        }
+        exercises.sort { $0.name.lowercased() < $1.name.lowercased() }
+        rebuildExerciseIndex()
+        flushExercises()
+    }
+
+    func deleteExercise(_ key: String) {
+        exercises.removeAll { $0.key == key }
+        rebuildExerciseIndex()
+        flushExercises()
+    }
+
+    private func flushExercises() {
+        do { try vault.writeExercises(exercises) }
+        catch { lastError = "Couldn't save exercise: \(error.localizedDescription)" }
     }
 
     // MARK: - Templates (workout definitions)
@@ -496,6 +547,65 @@ final class LogStore {
         writeDoc(log)
     }
 
+    /// Drop the day's logged workout entirely (e.g. undo a rest-day marking),
+    /// falling back to the scheduled suggestions again. No-op if none is set.
+    func clearWorkout(on date: Date) {
+        guard var log = log(for: date), log.workout != nil else { return }
+        log.workout = nil
+        writeDoc(log)
+    }
+
+    /// The scheduled workout's exercises that aren't logged yet on `date` — the
+    /// suggestion list shown under the logged ones (matched by library id, or
+    /// name for legacy free-typed entries). Empty on rest days.
+    func suggestedExercises(for date: Date) -> [ExerciseEntry] {
+        let planned = stickyWorkout(for: date)
+        guard planned.status != .rest else { return [] }
+        let logged = log(for: date)?.workout?.exercises ?? []
+        return planned.exercises.filter { p in
+            !logged.contains { sameExercise($0, p) }
+        }
+    }
+
+    /// Log one exercise onto the day, creating the workout shell (title/template
+    /// from the schedule) if needed. Replaces a matching entry rather than
+    /// duplicating it. Marks the day at least partially trained.
+    func logExercise(_ entry: ExerciseEntry, on date: Date) {
+        var log = editableLog(for: date)
+        var workout = log.workout ?? workoutShell(for: date)
+        if let index = workout.exercises.firstIndex(where: { sameExercise($0, entry) }) {
+            workout.exercises[index] = entry
+        } else {
+            workout.exercises.append(entry)
+        }
+        if workout.status != .done { workout.status = .partial }
+        log.workout = workout
+        writeDoc(log)
+    }
+
+    /// Log every not-yet-logged scheduled exercise at once — the whole plan done.
+    func logAllSuggested(on date: Date) {
+        let suggestions = suggestedExercises(for: date)
+        guard !suggestions.isEmpty else { return }
+        var log = editableLog(for: date)
+        var workout = log.workout ?? workoutShell(for: date)
+        workout.exercises.append(contentsOf: suggestions)
+        workout.status = .done
+        log.workout = workout
+        writeDoc(log)
+    }
+
+    /// An empty logged-workout shell carrying the scheduled title/template.
+    private func workoutShell(for date: Date) -> WorkoutEntry {
+        let planned = stickyWorkout(for: date)
+        return WorkoutEntry(status: .partial, template: planned.template, title: planned.title)
+    }
+
+    private func sameExercise(_ a: ExerciseEntry, _ b: ExerciseEntry) -> Bool {
+        if let ida = a.exerciseId, let idb = b.exerciseId { return ida == idb }
+        return a.name == b.name
+    }
+
     /// Writes the free-prose journal to the day file's markdown body.
     func saveNote(_ note: String?, on date: Date) {
         var log = editableLog(for: date)
@@ -506,6 +616,16 @@ final class LogStore {
     func addFood(_ entry: FoodEntry, on date: Date) {
         var log = editableLog(for: date)
         log.food.append(entry)
+        log.food.sort { $0.at < $1.at }
+        writeDoc(log)
+    }
+
+    /// Replace a logged food entry in place — used to adjust servings. Matches
+    /// by id (time + food), which servings don't affect, so the row stays put.
+    func updateFood(_ entry: FoodEntry, on date: Date) {
+        guard var log = log(for: date),
+              let index = log.food.firstIndex(where: { $0.id == entry.id }) else { return }
+        log.food[index] = entry
         log.food.sort { $0.at < $1.at }
         writeDoc(log)
     }
