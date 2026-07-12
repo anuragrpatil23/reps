@@ -11,8 +11,11 @@ Long-Term-Memory-iCloud/lifeblood_systems/Understanding Myself/Body/
 ├── sffit/
 │   ├── log/
 │   │   └── 2026/
-│   │       ├── 2026-07-11.md          ← one daily log per day (THE core file)
+│   │       ├── 2026-07-11.md          ← daily doc: workout / food / pics / note
 │   │       └── ...
+│   ├── data/
+│   │   ├── body-composition.csv       ← all weigh-ins (weight/BMI/fat/lean)
+│   │   └── activity.csv               ← daily Apple Watch / Activity history
 │   ├── templates/
 │   │   ├── push-a.md                  ← workout templates (sticky defaults)
 │   │   └── ...
@@ -25,6 +28,35 @@ Long-Term-Memory-iCloud/lifeblood_systems/Understanding Myself/Body/
 │   └── ...
 └── sffood/                            ← existing recipe notes (read + link only)
 ```
+
+## 1a. Where data lives — telemetry vs. journal
+
+Two kinds of data, stored by their nature:
+
+- **Machine telemetry → CSV** (`data/*.csv`). Weight/body-composition and daily
+  Apple Watch activity are high-volume, append-only, never hand-edited series.
+  Each lives in one CSV holding the whole history — lean to store, one file to
+  grep/import/chart, and read by the AI trainer in a single pass.
+- **What you log/journal → daily markdown** (`log/YYYY/*.md`). Workout, food,
+  pics, and the free-prose note are per-day, interactive, Obsidian-rendered.
+
+The app joins both by date in memory. Older `.md` files that still carry
+`metrics:`/`activity:` frontmatter are read as a fallback and migrate out to CSV
+on the next Health sync (markdown is no longer written with those keys).
+
+### body-composition.csv
+```
+date,weight_lbs,bmi,body_fat_pct,lean_mass_lbs,measured_at
+2026-07-10,138.2,19.5,23.8,99.7,2026-07-10T07:30:00-05:00
+```
+One row per weigh-in day. Empty cells for absent metrics.
+
+### activity.csv
+```
+date,steps,resting_hr,move_kcal,move_goal_kcal,exercise_min,exercise_goal_min,stand_hours,stand_goal_hours
+2026-07-10,8934,56,520,500,42,30,11,12
+```
+One row per day with any Apple Health/Watch activity; full history (~2 years).
 
 Rules:
 - The app **owns** `log/`, `templates/`, `progress-pics/` — it is the *sole writer* there.

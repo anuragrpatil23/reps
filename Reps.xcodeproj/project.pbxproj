@@ -22,9 +22,9 @@
 		96E018236CB0950D7BBC1AA9 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15F45625B8B6BDC264E0889 /* Theme.swift */; };
 		A7C875AB1761C25D79CB0543 /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F13DACEDABE9626B76AB42 /* VaultStore.swift */; };
 		AD42C80E7C9B40903C65D7C7 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3218CB7500C92B6893783B6 /* DailyLog.swift */; };
+		B194F4D93BC7004FD831DE5B /* TelemetryCsv.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF9487DA69B3CF8FB112593 /* TelemetryCsv.swift */; };
 		BF40289AF850BBC787312EB6 /* CompositionChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93937C7381A80F80BB707591 /* CompositionChartCard.swift */; };
 		BF702D63C7A54286CF954519 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 6D0A9FA6A13EDD0F299F8B4B /* Yams */; };
-		C2C6763F32C4398015EBBAA5 /* HealthTrends.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCCAE443AB85DBA45323804D /* HealthTrends.swift */; };
 		C391512178712884B418A5F8 /* MetricChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D65A23039317C53E1B45E3F /* MetricChartCard.swift */; };
 		C408CE5F84DA300AE6E7BC7C /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4326BAC8023FA2D80E38EB /* SettingsSheet.swift */; };
 		D8338D84090FA4DC72EDD1F7 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */; };
@@ -42,11 +42,12 @@
 		44FF9902462D2822BABDE53C /* ProgressImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressImage.swift; sourceTree = "<group>"; };
 		51F13DACEDABE9626B76AB42 /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStore.swift; sourceTree = "<group>"; };
 		5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		5FF9487DA69B3CF8FB112593 /* TelemetryCsv.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryCsv.swift; sourceTree = "<group>"; };
 		71D559EF44265DB8B63510DD /* FoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodEntrySheet.swift; sourceTree = "<group>"; };
 		808A4AF67562BF42CDE86016 /* RepsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepsApp.swift; sourceTree = "<group>"; };
 		814D767C115D1D463103432C /* WorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutCardView.swift; sourceTree = "<group>"; };
 		89F73E9CB8B46A571B9DEA48 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D65A23039317C53E1B45E3F /* MetricChartCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricChartCard.swift; sourceTree = "<group>"; };
 		93937C7381A80F80BB707591 /* CompositionChartCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionChartCard.swift; sourceTree = "<group>"; };
 		A15F45625B8B6BDC264E0889 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -61,7 +62,6 @@
 		CFD48382529EFD699B529389 /* ActivityLineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLineView.swift; sourceTree = "<group>"; };
 		D2361A195B2A30EB5385E7DF /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		F418752A8E29C447029115E4 /* Trends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trends.swift; sourceTree = "<group>"; };
-		FCCAE443AB85DBA45323804D /* HealthTrends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthTrends.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,9 +81,9 @@
 			children = (
 				C8524FB2C383EB0CBA2AF336 /* DailyLogCodec.swift */,
 				5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */,
-				FCCAE443AB85DBA45323804D /* HealthTrends.swift */,
 				04D6E780C05F014506FF465B /* LogStore.swift */,
 				44FF9902462D2822BABDE53C /* ProgressImage.swift */,
+				5FF9487DA69B3CF8FB112593 /* TelemetryCsv.swift */,
 				51F13DACEDABE9626B76AB42 /* VaultStore.swift */,
 			);
 			path = Services;
@@ -239,7 +239,6 @@
 				280819F0CA5D32E130C30991 /* DailyLogCodec.swift in Sources */,
 				4EDEA3558D9A2DB9E33AF1C5 /* FoodEntrySheet.swift in Sources */,
 				D8338D84090FA4DC72EDD1F7 /* HealthKitService.swift in Sources */,
-				C2C6763F32C4398015EBBAA5 /* HealthTrends.swift in Sources */,
 				082A618B27AC77D811170E1F /* LogStore.swift in Sources */,
 				C391512178712884B418A5F8 /* MetricChartCard.swift in Sources */,
 				9316A74731980309B9856924 /* ProgressImage.swift in Sources */,
@@ -247,6 +246,7 @@
 				8AEFAA1D39AF4577ADD69DB2 /* RootView.swift in Sources */,
 				C408CE5F84DA300AE6E7BC7C /* SettingsSheet.swift in Sources */,
 				0A42ABF4532925134350D9AB /* SpineView.swift in Sources */,
+				B194F4D93BC7004FD831DE5B /* TelemetryCsv.swift in Sources */,
 				96E018236CB0950D7BBC1AA9 /* Theme.swift in Sources */,
 				61CF46E9CBE943A1440C4ED0 /* TodayView.swift in Sources */,
 				EACC05A1231D06A8FDDF2621 /* Trends.swift in Sources */,
@@ -268,7 +268,6 @@
 				CODE_SIGN_ENTITLEMENTS = Reps/Reps.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2LWQ9LQUGT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Reps/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -411,7 +410,6 @@
 				CODE_SIGN_ENTITLEMENTS = Reps/Reps.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2LWQ9LQUGT;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Reps/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

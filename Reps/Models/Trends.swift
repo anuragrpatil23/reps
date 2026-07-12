@@ -39,6 +39,12 @@ func downsample<T>(_ items: [T], to max: Int) -> [T] {
     return indices.filter { seen.insert($0).inserted }.map { items[$0] }
 }
 
+/// Apple Health daily activity series (sourced from activity.csv).
+enum ActivityKind: String, CaseIterable, Identifiable, Sendable {
+    case steps, activeEnergy, exercise, restingHR
+    var id: String { rawValue }
+}
+
 enum BodyMetricKind: String, CaseIterable, Identifiable, Sendable {
     case weight, bodyFat, bmi, leanMass
     var id: String { rawValue }

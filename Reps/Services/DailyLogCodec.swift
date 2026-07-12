@@ -37,23 +37,9 @@ enum DailyLogCodec {
             "created_at": isoFormatter.string(from: log.createdAt ?? Date()),
             "updated_at": isoFormatter.string(from: Date()),
         ]
-        if let m = log.metrics {
-            var d: [String: Any] = ["weight_lbs": m.weightLbs]
-            if let v = m.bmi { d["bmi"] = v }
-            if let v = m.bodyFatPct { d["body_fat_pct"] = v }
-            if let v = m.leanMassLbs { d["lean_mass_lbs"] = v }
-            if let v = m.measuredAt { d["measured_at"] = isoFormatter.string(from: v) }
-            fm["metrics"] = d
-        }
-        if let a = log.activity {
-            var d: [String: Any] = [
-                "move_kcal": a.moveKcal, "move_goal_kcal": a.moveGoalKcal,
-                "exercise_min": a.exerciseMin, "exercise_goal_min": a.exerciseGoalMin,
-                "stand_hours": a.standHours, "stand_goal_hours": a.standGoalHours,
-            ]
-            if let v = a.steps { d["steps"] = v }
-            fm["activity"] = d
-        }
+        // NB: body metrics and activity are NOT written here — they live in the
+        // telemetry CSVs (see TelemetryCsv / docs/DATA-CONTRACT.md). The daily
+        // markdown holds only what you log/journal.
         if let w = log.workout {
             var d: [String: Any] = ["status": w.status.rawValue]
             if let v = w.template { d["template"] = v }

@@ -14,17 +14,42 @@ final class LogStore {
     private(set) var loaded = false
     var lastError: String?
 
+    // Telemetry lives in CSVs, not the daily markdown. These are the in-memory
+    // mirrors we flush whole-file on change; logsByDay is the joined view.
+    private var metricsByDay: [Date: BodyMetrics] = [:]
+    private var activityByDay: [Date: ActivitySummary] = [:]
+
     var vaultConfigured: Bool { vault.isConfigured }
 
     // MARK: - Load / rebuild
 
     func load() {
-        logsByDay = [:]
+        // Daily markdown = workout/food/pics/note (plus legacy metrics/activity
+        // in older files, which we honor until the next sync migrates them).
+        var docs: [Date: DailyLog] = [:]
         for date in vault.listLogDates() {
             if let log = vault.readDailyLog(for: date) {
-                logsByDay[Calendar.current.startOfDay(for: date)] = log
+                docs[Calendar.current.startOfDay(for: date)] = log
             }
         }
+        // CSV telemetry wins over any legacy markdown copy.
+        metricsByDay = vault.readBodyComposition()
+        activityByDay = vault.readActivity()
+        for (day, log) in docs {
+            if metricsByDay[day] == nil, let m = log.metrics { metricsByDay[day] = m }
+            if activityByDay[day] == nil, let a = log.activity { activityByDay[day] = a }
+        }
+
+        // Join into the view model.
+        logsByDay = [:]
+        let allDays = Set(docs.keys).union(metricsByDay.keys).union(activityByDay.keys)
+        for day in allDays {
+            var log = docs[day] ?? DailyLog(date: day)
+            log.metrics = metricsByDay[day]
+            log.activity = activityByDay[day]
+            logsByDay[day] = log
+        }
+
         let fromVault = vault.readTemplates()
         templates = fromVault.isEmpty ? [.builtinPushA] : fromVault
         loaded = true
@@ -171,14 +196,19 @@ final class LogStore {
         return bars
     }
 
-    // MARK: - Writes (file-first, then cache)
+    // MARK: - Writes
 
-    func upsert(_ log: DailyLog) {
+    /// Persists the day's markdown doc (workout/food/pics/note) and refreshes
+    /// the joined view. Telemetry is never written here — see flushTelemetry.
+    private func writeDoc(_ log: DailyLog) {
         var toSave = log
         if toSave.createdAt == nil { toSave.createdAt = Date() }
         do {
             try vault.writeDailyLog(toSave)
-            logsByDay[Calendar.current.startOfDay(for: toSave.date)] = toSave
+            let day = Calendar.current.startOfDay(for: toSave.date)
+            toSave.metrics = metricsByDay[day]     // keep the joined view whole
+            toSave.activity = activityByDay[day]
+            logsByDay[day] = toSave
             lastError = nil
         } catch {
             lastError = "Couldn't save to vault: \(error.localizedDescription)"
@@ -192,21 +222,21 @@ final class LogStore {
     func saveWorkout(_ workout: WorkoutEntry, on date: Date) {
         var log = editableLog(for: date)
         log.workout = workout
-        upsert(log)
+        writeDoc(log)
     }
 
     /// Writes the free-prose journal to the day file's markdown body.
     func saveNote(_ note: String?, on date: Date) {
         var log = editableLog(for: date)
         log.note = note
-        upsert(log)
+        writeDoc(log)
     }
 
     func addFood(_ entry: FoodEntry, on date: Date) {
         var log = editableLog(for: date)
         log.food.append(entry)
         log.food.sort { $0.at < $1.at }
-        upsert(log)
+        writeDoc(log)
     }
 
     func addPhoto(_ jpeg: Data, pose: PicPose, on date: Date) {
@@ -214,52 +244,73 @@ final class LogStore {
             let path = try vault.savePhoto(jpeg, date: date, pose: pose)
             var log = editableLog(for: date)
             log.pics.append(ProgressPic(path: path, pose: pose))
-            upsert(log)
+            writeDoc(log)
         } catch {
             lastError = "Couldn't save photo: \(error.localizedDescription)"
         }
     }
 
+    // MARK: - Telemetry sync (HealthKit → CSV)
+
     /// Whether a Health sync is running (drives the Settings status line).
     private(set) var syncing = false
 
-    /// Pulls HealthKit into the vault: every recent weigh-in lands in its own
-    /// day's log; activity fills today plus any recent day that already has a
-    /// log. Idempotent and change-gated, so re-running writes nothing new.
+    /// Pulls HealthKit into the telemetry CSVs: full weigh-in history →
+    /// body-composition.csv, ~2 years of daily activity → activity.csv. Both
+    /// are whole-file flushes, idempotent, and never touch the daily markdown.
     func syncHealth(around date: Date) async {
         guard vaultConfigured, HealthKitService.isAvailable else { return }
         syncing = true
         defer { syncing = false }
 
-        // Full weigh-in history — the whole body-composition record.
-        for (day, metrics) in await HealthKitService.weighIns(since: .distantPast) {
-            var log = editableLog(for: day)
-            if log.metrics != metrics {
-                log.metrics = metrics
-                upsert(log)
-            }
+        let weighIns = await HealthKitService.weighIns(since: .distantPast)
+        var metricsChanged = false
+        for (day, metrics) in weighIns where metricsByDay[day] != metrics {
+            metricsByDay[day] = metrics
+            metricsChanged = true
         }
 
-        let today = Calendar.current.startOfDay(for: .now)
-        var activityDays: Set<Date> = [today, Calendar.current.startOfDay(for: date)]
-        for offset in 1...7 {
-            if let d = Calendar.current.date(byAdding: .day, value: -offset, to: today),
-               logsByDay[d] != nil {
-                activityDays.insert(d)
-            }
+        let activity = await HealthKitService.activityHistory(days: 730)
+        var activityChanged = false
+        for (day, summary) in activity where activityByDay[day] != summary {
+            activityByDay[day] = summary
+            activityChanged = true
         }
-        for day in activityDays {
-            // Don't create an empty file for a past day that has no log.
-            if day != today && logsByDay[day] == nil { continue }
-            guard let activity = await HealthKitService.activity(for: day) else { continue }
-            var log = editableLog(for: day)
-            if log.activity?.moveKcal != activity.moveKcal
-                || log.activity?.exerciseMin != activity.exerciseMin
-                || log.activity?.standHours != activity.standHours
-                || log.activity?.steps != activity.steps {
-                log.activity = activity
-                upsert(log)
+
+        do {
+            if metricsChanged { try vault.writeBodyComposition(metricsByDay) }
+            if activityChanged { try vault.writeActivity(activityByDay) }
+        } catch {
+            lastError = "Couldn't save telemetry: \(error.localizedDescription)"
+        }
+
+        if metricsChanged || activityChanged { rejoin() }
+    }
+
+    /// Rebuild the joined view after telemetry changes (no file reads).
+    private func rejoin() {
+        let allDays = Set(logsByDay.keys).union(metricsByDay.keys).union(activityByDay.keys)
+        for day in allDays {
+            var log = logsByDay[day] ?? DailyLog(date: day)
+            log.metrics = metricsByDay[day]
+            log.activity = activityByDay[day]
+            logsByDay[day] = log
+        }
+    }
+
+    // MARK: - Activity series (for the Trends Apple Health charts)
+
+    func activitySeries(_ kind: ActivityKind) -> [MetricPoint] {
+        activityByDay.keys.sorted().compactMap { day in
+            guard let a = activityByDay[day] else { return nil }
+            let value: Double?
+            switch kind {
+            case .steps: value = a.steps.map(Double.init)
+            case .activeEnergy: value = a.moveKcal > 0 ? Double(a.moveKcal) : nil
+            case .exercise: value = a.exerciseMin > 0 ? Double(a.exerciseMin) : nil
+            case .restingHR: value = a.restingHR.map(Double.init)
             }
+            return value.map { MetricPoint(date: day, value: $0) }
         }
     }
 }

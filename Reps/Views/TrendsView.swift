@@ -5,7 +5,6 @@ import Charts
 /// training consistency, in the Ledger aesthetic.
 struct TrendsView: View {
     @Environment(LogStore.self) private var store
-    @State private var health = HealthTrends()
     @State private var range: TrendRange = .threeMonths
     @State private var selectedLift: String?
 
@@ -38,10 +37,9 @@ struct TrendsView: View {
         }
         .background(Palette.paper.ignoresSafeArea())
         .task { if !store.loaded { store.load() } }
-        .task(id: range) { await health.load(days: range.days) }
     }
 
-    // MARK: Apple Health
+    // MARK: Apple Health (read from activity.csv)
 
     private var healthSection: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -51,13 +49,13 @@ struct TrendsView: View {
                 .foregroundStyle(Palette.graphite)
                 .padding(.top, 8)
             MetricChartCard(title: "Steps", unit: "",
-                            points: ranged(health.steps), stock: Palette.sage)
+                            points: ranged(store.activitySeries(.steps)), stock: Palette.sage)
             MetricChartCard(title: "Active energy", unit: "kcal",
-                            points: ranged(health.activeEnergy), stock: Palette.sage)
+                            points: ranged(store.activitySeries(.activeEnergy)), stock: Palette.sage)
             MetricChartCard(title: "Exercise", unit: "min",
-                            points: ranged(health.exercise), stock: Palette.sage)
+                            points: ranged(store.activitySeries(.exercise)), stock: Palette.sage)
             MetricChartCard(title: "Resting heart rate", unit: "bpm",
-                            points: ranged(health.restingHR), stock: Palette.chalk)
+                            points: ranged(store.activitySeries(.restingHR)), stock: Palette.chalk)
         }
     }
 

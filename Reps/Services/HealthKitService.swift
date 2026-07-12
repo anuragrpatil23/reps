@@ -109,7 +109,56 @@ enum HealthKitService {
         }
     }
 
-    // MARK: - Activity
+    // MARK: - Activity history (for the activity CSV)
+
+    /// Per-day activity for `days` back: rings + goals from Activity summaries,
+    /// merged with steps and resting HR. Only days with some data are returned.
+    static func activityHistory(days: Int) async -> [Date: ActivitySummary] {
+        var byDay = await activitySummaries(days: days)
+        let cal = Calendar.current
+        for point in await dailySeries(.stepCount, unit: .count(), days: days, options: .cumulativeSum) {
+            let day = cal.startOfDay(for: point.date)
+            byDay[day, default: ActivitySummary(moveKcal: 0, exerciseMin: 0, standHours: 0)].steps = Int(point.value)
+        }
+        let bpm = HKUnit.count().unitDivided(by: .minute())
+        for point in await dailySeries(.restingHeartRate, unit: bpm, days: days, options: .discreteAverage) {
+            let day = cal.startOfDay(for: point.date)
+            byDay[day, default: ActivitySummary(moveKcal: 0, exerciseMin: 0, standHours: 0)].restingHR = Int(point.value.rounded())
+        }
+        return byDay
+    }
+
+    private static func activitySummaries(days: Int) async -> [Date: ActivitySummary] {
+        let cal = Calendar.current
+        let end = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
+        var startComp = cal.dateComponents([.year, .month, .day], from: start)
+        startComp.calendar = cal
+        var endComp = cal.dateComponents([.year, .month, .day], from: end)
+        endComp.calendar = cal
+        let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: startComp, end: endComp)
+        return await withCheckedContinuation { continuation in
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, _ in
+                var result: [Date: ActivitySummary] = [:]
+                for s in summaries ?? [] {
+                    guard let date = s.dateComponents(for: cal).date else { continue }
+                    let goalMove = s.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie())
+                    result[cal.startOfDay(for: date)] = ActivitySummary(
+                        moveKcal: Int(s.activeEnergyBurned.doubleValue(for: .kilocalorie())),
+                        moveGoalKcal: goalMove > 0 ? Int(goalMove) : 500,
+                        exerciseMin: Int(s.appleExerciseTime.doubleValue(for: .minute())),
+                        exerciseGoalMin: Int(max(s.appleExerciseTimeGoal.doubleValue(for: .minute()), 1)),
+                        standHours: Int(s.appleStandHours.doubleValue(for: .count())),
+                        standGoalHours: Int(max(s.appleStandHoursGoal.doubleValue(for: .count()), 1))
+                    )
+                }
+                continuation.resume(returning: result)
+            }
+            store.execute(query)
+        }
+    }
+
+    // MARK: - Activity (single day, for the Today rings)
 
     static func activity(for day: Date) async -> ActivitySummary? {
         let summary = await activitySummary(for: day)

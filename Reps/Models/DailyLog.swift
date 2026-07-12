@@ -38,7 +38,7 @@ struct BodyMetrics: Codable, Sendable, Equatable {
     }
 }
 
-struct ActivitySummary: Codable, Sendable {
+struct ActivitySummary: Codable, Sendable, Equatable {
     var moveKcal: Int
     var moveGoalKcal: Int = 500
     var exerciseMin: Int
@@ -46,6 +46,7 @@ struct ActivitySummary: Codable, Sendable {
     var standHours: Int
     var standGoalHours: Int = 12
     var steps: Int?
+    var restingHR: Int?
 }
 
 enum WorkoutStatus: String, Codable, Sendable {

@@ -151,4 +151,39 @@ final class VaultStore {
             try? Data(contentsOf: root.appending(path: relativePath))
         } ?? nil
     }
+
+    // MARK: - Telemetry CSVs
+
+    private func readText(_ relativePath: String) -> String? {
+        withAccess { root in
+            try? String(contentsOf: root.appending(path: relativePath), encoding: .utf8)
+        } ?? nil
+    }
+
+    private func writeText(_ text: String, to relativePath: String) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: relativePath)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: url, options: .atomic)
+        }
+    }
+
+    func readBodyComposition() -> [Date: BodyMetrics] {
+        guard let text = readText(TelemetryCsv.bodyCompositionPath) else { return [:] }
+        return TelemetryCsv.parseBodyComposition(text)
+    }
+
+    func writeBodyComposition(_ metrics: [Date: BodyMetrics]) throws {
+        try writeText(TelemetryCsv.formatBodyComposition(metrics), to: TelemetryCsv.bodyCompositionPath)
+    }
+
+    func readActivity() -> [Date: ActivitySummary] {
+        guard let text = readText(TelemetryCsv.activityPath) else { return [:] }
+        return TelemetryCsv.parseActivity(text)
+    }
+
+    func writeActivity(_ activity: [Date: ActivitySummary]) throws {
+        try writeText(TelemetryCsv.formatActivity(activity), to: TelemetryCsv.activityPath)
+    }
 }
