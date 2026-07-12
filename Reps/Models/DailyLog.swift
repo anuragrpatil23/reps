@@ -118,7 +118,7 @@ struct SetEntry: Codable, Hashable, Sendable {
     var weightLbs: Double
 }
 
-struct FoodEntry: Codable, Identifiable, Sendable {
+struct FoodEntry: Codable, Identifiable, Sendable, Equatable {
     var at: String
     var text: String?
     var recipe: String?
@@ -140,20 +140,24 @@ struct ProgressPic: Codable, Identifiable, Sendable {
     var id: String { path }
 }
 
-/// How a day renders on the Spine — the app's consistency record.
-enum DayMark: Sendable {
-    case trained   // full-height ink stroke
-    case logged    // mid-height stroke
-    case empty     // faint dot
+/// How a day renders on the Spine — the app's consistency record. Each day is a
+/// stacked bar: strength minutes (dark ink, at the base) plus walking/movement
+/// minutes (moss, on top), so bar height reads as total training volume while
+/// the split doubles as a strength-vs-walking graph. Days with no movement but
+/// some log (food/metrics/pics) show a faint `logged` tick; bare days are empty.
+struct DayBar: Sendable {
+    var strengthMin: Double
+    var walkMin: Double
+    var logged: Bool
 
-    init(log: DailyLog?) {
-        guard let log else { self = .empty; return }
-        if let workout = log.workout, workout.status == .done || workout.status == .partial {
-            self = .trained
-        } else if log.metrics != nil || !log.food.isEmpty || !log.pics.isEmpty {
-            self = .logged
-        } else {
-            self = .empty
-        }
+    /// No training and nothing logged — a bare day.
+    var isEmpty: Bool { strengthMin == 0 && walkMin == 0 && !logged }
+    /// No movement at all (may still have a food/metrics log).
+    var isTrainingless: Bool { strengthMin == 0 && walkMin == 0 }
+
+    init(split: (strength: Double, walk: Double), log: DailyLog?) {
+        strengthMin = split.strength
+        walkMin = split.walk
+        logged = log.map { $0.metrics != nil || !$0.food.isEmpty || !$0.pics.isEmpty } ?? false
     }
 }

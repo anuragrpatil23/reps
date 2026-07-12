@@ -3,11 +3,17 @@ import SwiftUI
 /// One quiet line of activity — hairline arcs, not Apple's thick rings.
 struct ActivityLineView: View {
     let activity: ActivitySummary
+    /// Total minutes of workouts the watch recorded that day. Apple's
+    /// exercise-minute credit is stingy for low-HR work (a 45m strength
+    /// session can score 2m), so we floor Exercise at recorded workout time.
+    var sessionMinutes: Int = 0
+
+    private var exerciseMin: Int { max(activity.exerciseMin, sessionMinutes) }
 
     var body: some View {
         HStack(spacing: 18) {
             metric("Move", value: "\(activity.moveKcal)", progress: ratio(activity.moveKcal, activity.moveGoalKcal))
-            metric("Exercise", value: "\(activity.exerciseMin)m", progress: ratio(activity.exerciseMin, activity.exerciseGoalMin))
+            metric("Exercise", value: "\(exerciseMin)m", progress: ratio(exerciseMin, activity.exerciseGoalMin))
             metric("Stand", value: "\(activity.standHours)", progress: ratio(activity.standHours, activity.standGoalHours))
             Spacer(minLength: 0)
         }

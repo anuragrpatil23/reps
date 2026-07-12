@@ -12,6 +12,7 @@ struct FoodPickerSheet: View {
     @State private var search = ""
     @State private var showNewFood = false
     @State private var servingFor: Food?
+    @State private var editingFood: Food?
 
     private var filtered: [Food] {
         let all = store.foods.sorted { $0.name.lowercased() < $1.name.lowercased() }
@@ -31,6 +32,14 @@ struct FoodPickerSheet: View {
                 ForEach(filtered) { food in
                     Button { servingFor = food } label: { row(food) }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button { editingFood = food } label: {
+                                Label("Edit food", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) { store.deleteFood(food.id) } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                 }
             }
             .listStyle(.plain)
@@ -49,6 +58,7 @@ struct FoodPickerSheet: View {
                 }
             }
             .sheet(isPresented: $showNewFood) { FoodFormSheet() }
+            .sheet(item: $editingFood) { FoodFormSheet(editing: $0) }
             .sheet(item: $servingFor) { food in
                 ServingEditor(food: food) { entry in
                     onLog(entry)
@@ -62,8 +72,8 @@ struct FoodPickerSheet: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(food.name).font(Typo.body).foregroundStyle(Palette.ink)
-                if !food.servingDesc.isEmpty {
-                    Text(food.servingDesc).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                if !food.servingLabel.isEmpty {
+                    Text(food.servingLabel).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
                 }
             }
             Spacer()
@@ -88,7 +98,7 @@ private struct ServingEditor: View {
     @State private var servingGrams: Double?
     @FocusState private var focus: Field?
 
-    private enum Field { case grams }
+    private enum Field { case grams, pieces }
 
     init(food: Food, onAdd: @escaping (FoodEntry) -> Void) {
         self.food = food
@@ -107,6 +117,7 @@ private struct ServingEditor: View {
 
     private var scaled: Macros { food.macros.scaled(by: servings) }
     private var hasWeight: Bool { (servingGrams ?? 0) > 0 }
+    private var hasPieces: Bool { (food.servingPieces ?? 0) > 0 }
 
     /// Grams eaten ⇄ servings, once a serving weight is known.
     private var gramsBinding: Binding<Double> {
@@ -118,13 +129,23 @@ private struct ServingEditor: View {
         )
     }
 
+    /// Pieces eaten ⇄ servings, once a per-serving piece count is known.
+    private var piecesBinding: Binding<Double> {
+        Binding(
+            get: { servings * (food.servingPieces ?? 0) },
+            set: { pieces in
+                if let per = food.servingPieces, per > 0 { servings = pieces / per }
+            }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(food.name).font(Typo.display).foregroundStyle(Palette.ink)
-                    if !food.servingDesc.isEmpty {
-                        Text(food.servingDesc).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                    if !food.servingLabel.isEmpty {
+                        Text(food.servingLabel).font(Typo.monoSmall).foregroundStyle(Palette.graphite)
                     }
                 }
 
@@ -138,8 +159,14 @@ private struct ServingEditor: View {
                 }
                 .tint(Palette.madder)
 
-                // Log by grams — the serving weight comes from the food (or its
-                // serving text); set it when editing the food, not here.
+                // Log by pieces or grams — both come from the food (set when
+                // editing it) and just re-express the serving count.
+                if hasPieces {
+                    fieldRow("Pieces eaten", unit: "pcs", field: .pieces) {
+                        TextField("pieces", value: piecesBinding, format: .number.precision(.fractionLength(0...1)))
+                            .focused($focus, equals: .pieces)
+                    }
+                }
                 if hasWeight {
                     fieldRow("Amount eaten", unit: "g", field: .grams) {
                         TextField("grams", value: gramsBinding, format: .number.precision(.fractionLength(0...1)))
@@ -174,7 +201,7 @@ private struct ServingEditor: View {
                     Button("Done") { focus = nil }.foregroundStyle(Palette.madder)
                 }
             }
-            .presentationDetents([.height(320)])
+            .presentationDetents([.height(320 + (hasPieces ? 44 : 0) + (hasWeight ? 44 : 0))])
         }
     }
 

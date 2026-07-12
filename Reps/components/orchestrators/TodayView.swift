@@ -11,11 +11,45 @@ struct TodayView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var pendingPhoto: Data?
     @State private var showingCamera = false
+    @State private var picViewer: ProgressPicContext?
+    @State private var picsUnlocked = false
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Target body-fat %, a personal preference (0 = unset). Shared with Settings.
     @AppStorage("reps.targetBodyFatPct") private var targetBodyFatPct = 0.0
 
+    /// Blur progress pics + require Face ID to open them. Default on. Shared with Settings.
+    @AppStorage("reps.lockPhotos") private var lockPhotos = true
+
+    // Energy & macro knobs (edited in Settings). Baseline 0 = auto from lean mass.
+    @AppStorage("reps.baselineBurn") private var baselineBurn = 0.0
+    @AppStorage("reps.dailyDeficit") private var dailyDeficit = 500.0
+    @AppStorage("reps.proteinPerLbLean") private var proteinPerLbLean = 1.0
+    @AppStorage("reps.fatPerLbBody") private var fatPerLbBody = 0.35
+
+    /// Today's energy picture from the most-recent weigh-in, today's movement,
+    /// and what's logged — the source for the balance + macro-target lines.
+    private var budget: EnergyBudget {
+        let metrics = log?.metrics ?? store.recentMetrics(asOf: selectedDay)?.metrics
+        return EnergyBudget(
+            leanMassLbs: metrics?.leanMass,
+            weightLbs: metrics?.weightLbs,
+            activeKcal: Double(log?.activity?.moveKcal ?? 0),
+            intake: store.macros(for: selectedDay),
+            baselineOverride: baselineBurn,
+            dailyDeficit: dailyDeficit,
+            proteinPerLbLean: proteinPerLbLean,
+            fatPerLbBody: fatPerLbBody
+        )
+    }
+
     private var log: DailyLog? { store.log(for: selectedDay) }
+
+    /// Total minutes of watch-recorded workouts on a day — floors the Exercise
+    /// ring so a long session isn't hidden by Apple's stingy minute credit.
+    private func sessionMinutes(on date: Date) -> Int {
+        Int(store.workoutSessions(on: date).reduce(0) { $0 + $1.durationMin }.rounded())
+    }
 
     /// Rolling window ending today; empty days render as faint dots.
     private var spineDays: [Date] {
@@ -33,7 +67,7 @@ struct TodayView: View {
                     weightBlock
                         .padding(.bottom, 4)
                     if let activity = log?.activity {
-                        ActivityLineView(activity: activity)
+                        ActivityLineView(activity: activity, sessionMinutes: sessionMinutes(on: selectedDay))
                             .cardStock(Palette.sage)
                     }
                     sleepSection
@@ -41,6 +75,7 @@ struct TodayView: View {
                     workoutSection
                     foodSection
                         .cardStock(Palette.butter)
+                    energySection
                     picsSection
                     DayNotesEditor(
                         day: selectedDay,
@@ -58,7 +93,9 @@ struct TodayView: View {
             .refreshable { await store.syncHealth(around: selectedDay) }
             SpineView(
                 days: spineDays,
-                marks: spineDays.map { DayMark(log: store.log(for: $0)) },
+                marks: spineDays.map {
+                    DayBar(split: store.trainingSplit(on: $0), log: store.log(for: $0))
+                },
                 selected: $selectedDay
             )
             .padding(.horizontal, 24)
@@ -105,6 +142,12 @@ struct TodayView: View {
                 Button(pose.rawValue.capitalized) { savePendingPhoto(as: pose) }
             }
         }
+        .fullScreenCover(item: $picViewer) { context in
+            ProgressPicViewer(context: context) { store.vault.readFile(at: $0) }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { picsUnlocked = false }   // re-lock when we leave
+        }
     }
 
     // MARK: - photo plumbing
@@ -123,6 +166,23 @@ struct TodayView: View {
         guard let data = pendingPhoto else { return }
         store.addPhoto(data, pose: pose, on: selectedDay)
         pendingPhoto = nil
+    }
+
+    /// Open the viewer on `pic`, gating behind Face ID if pics are locked and
+    /// we haven't already unlocked this session.
+    private func openPics(at pic: ProgressPic) {
+        guard let pics = log?.pics, let idx = pics.firstIndex(where: { $0.id == pic.id }) else { return }
+        let context = ProgressPicContext(pics: pics, startIndex: idx)
+        if lockPhotos && !picsUnlocked {
+            Task {
+                if await PhotoAuth.authenticate() {
+                    picsUnlocked = true
+                    picViewer = context
+                }
+            }
+        } else {
+            picViewer = context
+        }
     }
 
     // MARK: masthead
@@ -267,9 +327,54 @@ struct TodayView: View {
                         }
                     }
                 }
-                macroTotals
-            } else {
+            } else if store.plannedStaples(for: selectedDay).isEmpty {
                 emptyLine("Nothing logged yet.")
+            }
+            plannedStaples
+            macroTotals
+        }
+    }
+
+    /// The active meal plan's not-yet-logged staples, shown faint with a tap to
+    /// log — one at a time, or all at once. They drop off as you add them.
+    @ViewBuilder
+    private var plannedStaples: some View {
+        let planned = store.plannedStaples(for: selectedDay)
+        if !planned.isEmpty {
+            HStack(alignment: .firstTextBaseline) {
+                Text("From your plan").font(Typo.monoSmall).foregroundStyle(Palette.graphite)
+                Spacer()
+                Button {
+                    store.logStaples(on: selectedDay)
+                } label: {
+                    Text("Add all").font(Typo.monoSmall).foregroundStyle(Palette.madder)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 12)
+            .padding(.bottom, 2)
+            ForEach(planned) { staple in
+                Button {
+                    store.addFood(staple, on: selectedDay)
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Palette.madder)
+                        Text(foodLabel(staple))
+                            .font(Typo.body)
+                            .foregroundStyle(Palette.graphite)
+                        Spacer(minLength: 0)
+                        if let m = store.macros(for: staple) {
+                            Text("\(Int(m.calories.rounded()))")
+                                .font(Typo.mono)
+                                .foregroundStyle(Palette.graphite)
+                        }
+                    }
+                    .padding(.vertical, 9)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -303,6 +408,48 @@ struct TodayView: View {
             }
             .font(Typo.mono)
             .padding(.top, 10)
+        }
+    }
+
+    /// Calories out (resting + activity) vs in, with macro targets — its own card.
+    /// Shown as soon as there's a resting burn to compute, even before logging.
+    @ViewBuilder
+    private var energySection: some View {
+        let b = budget
+        if let out = b.caloriesOut, let rest = b.baselineBurn {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Energy")
+                VStack(alignment: .leading, spacing: 4) {
+                    if let bal = b.balance {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("\(Int(abs(bal).rounded()))")
+                                .font(Typo.display)
+                                .foregroundStyle(bal >= 0 ? Palette.ink : Palette.madder)
+                            Text(bal >= 0 ? "kcal deficit" : "kcal surplus")
+                                .font(Typo.mono)
+                                .foregroundStyle(Palette.graphite)
+                        }
+                    }
+                    Text("\(Int(out.rounded())) out · \(Int(b.intake.calories.rounded())) in")
+                        .font(Typo.mono)
+                        .foregroundStyle(Palette.ink)
+                    Text("resting \(Int(rest.rounded())) + active \(Int(b.activeKcal.rounded()))")
+                        .font(Typo.monoSmall)
+                        .foregroundStyle(Palette.graphite)
+                    if let target = b.targetCalories {
+                        Text("target \(Int(target.rounded())) kcal in")
+                            .font(Typo.mono)
+                            .foregroundStyle(Palette.graphite)
+                            .padding(.top, 2)
+                    }
+                    if let p = b.proteinTarget, let c = b.carbTarget, let f = b.fatTarget {
+                        Text("P \(Int(b.intake.proteinG.rounded()))/\(Int(p.rounded())) · C \(Int(b.intake.carbsG.rounded()))/\(Int(c.rounded())) · F \(Int(b.intake.fatG.rounded()))/\(Int(f.rounded())) g")
+                            .font(Typo.mono)
+                            .foregroundStyle(Palette.graphite)
+                    }
+                }
+            }
+            .cardStock(Palette.mist)
         }
     }
 
@@ -345,26 +492,12 @@ struct TodayView: View {
         }
     }
 
-    @ViewBuilder
     private func picThumb(_ pic: ProgressPic) -> some View {
-        ZStack {
-            if let data = store.vault.readFile(at: pic.path), let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Palette.chalk
-            }
-        }
-        .frame(width: 64, height: 84)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .bottom) {
-            Text(pic.pose.rawValue)
-                .font(Typo.monoSmall)
-                .foregroundStyle(Palette.paper)
-                .shadow(color: .black.opacity(0.7), radius: 2)
-                .padding(.bottom, 6)
-        }
+        PicThumb(
+            pic: pic,
+            data: store.vault.readFile(at: pic.path),
+            locked: lockPhotos && !picsUnlocked
+        ) { openPics(at: pic) }
     }
 
     // MARK: sleep (nightly stages from sleep.csv)

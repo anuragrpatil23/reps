@@ -8,7 +8,17 @@ enum TextRecognizer {
         let orientation = cgOrientation(image.imageOrientation)
         return await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest { request, _ in
+                // Sort top-to-bottom, then left-to-right (Vision's origin is
+                // bottom-left, so a larger midY sits higher on the label). This
+                // puts the product name near the front and gives the parser/model
+                // the panel in reading order.
                 let lines = (request.results as? [VNRecognizedTextObservation] ?? [])
+                    .sorted { a, b in
+                        if abs(a.boundingBox.midY - b.boundingBox.midY) > 0.015 {
+                            return a.boundingBox.midY > b.boundingBox.midY
+                        }
+                        return a.boundingBox.minX < b.boundingBox.minX
+                    }
                     .compactMap { $0.topCandidates(1).first?.string }
                 continuation.resume(returning: lines)
             }

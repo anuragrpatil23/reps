@@ -4,8 +4,12 @@ import SwiftUI
 /// Ink density IS the consistency record. Scrub or tap to flip day pages.
 struct SpineView: View {
     let days: [Date]          // oldest → newest
-    let marks: [DayMark]      // parallel to days
+    let marks: [DayBar]       // parallel to days
     @Binding var selected: Date
+
+    /// Minutes that fill the bar to full height — the volume ceiling.
+    private let capMinutes: Double = 75
+    private let maxBarHeight: CGFloat = 32
 
     private let tickWidth: CGFloat = 3
     private let spacing: CGFloat = 6
@@ -34,26 +38,46 @@ struct SpineView: View {
     }
 
     @ViewBuilder
-    private func tick(for date: Date, mark: DayMark) -> some View {
+    private func tick(for date: Date, mark: DayBar) -> some View {
         let isToday = Calendar.current.isDateInToday(date)
         let isSelected = Calendar.current.isDate(date, inSameDayAs: selected)
-        let height: CGFloat = switch mark {
-        case .trained: 30
-        case .logged: 18
-        case .empty: 5
-        }
-        Capsule()
-            .fill(isToday ? Palette.madder : (mark == .empty ? Palette.hairline : Palette.ink))
-            .frame(width: tickWidth, height: height)
-            .frame(maxHeight: 34, alignment: .bottom)
-            .overlay(alignment: .bottom) {
-                if isSelected {
-                    Circle()
-                        .fill(isToday ? Palette.madder : Palette.ink)
-                        .frame(width: 4, height: 4)
-                        .offset(y: 9)
+        Group {
+            if mark.isTrainingless {
+                // No movement: a faint tick — a hair taller when something was logged.
+                Capsule()
+                    .fill(mark.logged ? Palette.graphite : Palette.hairline)
+                    .frame(width: tickWidth, height: mark.logged ? 7 : 5)
+            } else {
+                let total = mark.strengthMin + mark.walkMin
+                let barHeight = max(4, maxBarHeight * CGFloat(min(total, capMinutes) / capMinutes))
+                let strengthHeight = barHeight * CGFloat(mark.strengthMin / total)
+                VStack(spacing: 0) {
+                    segment(mark.walkMin, height: barHeight - strengthHeight, color: Palette.moss)
+                    segment(mark.strengthMin, height: strengthHeight, color: Palette.ink)
                 }
+                .frame(width: tickWidth)
+                .clipShape(Capsule())
             }
+        }
+        .frame(maxHeight: 34, alignment: .bottom)
+        .overlay(alignment: .bottom) {
+            // Madder dot marks the selected day; today always carries the accent.
+            if isSelected || isToday {
+                Circle()
+                    .fill(isToday ? Palette.madder : Palette.ink)
+                    .frame(width: 4, height: 4)
+                    .offset(y: 9)
+            }
+        }
+    }
+
+    /// One color band of the stacked bar; collapses to nothing when its
+    /// minutes are zero, but keeps a visible sliver when present.
+    @ViewBuilder
+    private func segment(_ minutes: Double, height: CGFloat, color: Color) -> some View {
+        if minutes > 0 {
+            Rectangle().fill(color).frame(height: max(2, height))
+        }
     }
 
     private func scrub(windowDays: [Date], width: CGFloat) -> some Gesture {

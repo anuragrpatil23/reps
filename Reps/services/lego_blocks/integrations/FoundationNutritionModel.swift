@@ -8,11 +8,13 @@ import FoundationModels
 enum FoundationNutritionModel {
     @Generable
     struct Extracted {
-        @Guide(description: "Product or food name, if present on the label")
+        @Guide(description: "The product / food name — the brand or item, e.g. 'Cheerios' or 'Peanut Butter'. This is printed on the packaging above or beside the panel, NOT inside the Nutrition Facts box itself (which only lists nutrients). Pick the most prominent non-nutrient text; omit if none is present.")
         var name: String?
-        @Guide(description: "Serving size text, e.g. '1 cup (170g)'")
+        @Guide(description: "Serving size text, e.g. '1 cup (170g)' or '3 crackers'")
         var servingDesc: String?
-        @Guide(description: "Calories (kcal) per serving")
+        @Guide(description: "Number of pieces/items in one serving, e.g. 3 for '3 crackers'. Omit for measured servings like cups or grams.")
+        var servingPieces: Double?
+        @Guide(description: "Calories (kcal) per serving — the large headline number by the word 'Calories'. In OCR text it often appears on the line directly below the 'Calories' label rather than next to it. Ignore any 'Calories from fat' value.")
         var calories: Double?
         @Guide(description: "Protein grams per serving")
         var proteinG: Double?
@@ -20,8 +22,6 @@ enum FoundationNutritionModel {
         var carbsG: Double?
         @Guide(description: "Total fat grams per serving")
         var fatG: Double?
-        @Guide(description: "Servings per container, if stated")
-        var servingsPerContainer: Double?
         @Guide(description: "Saturated fat grams per serving")
         var satFatG: Double?
         @Guide(description: "Trans fat grams per serving")
@@ -49,7 +49,7 @@ enum FoundationNutritionModel {
     static func extract(from lines: [String]) async -> NutritionFacts? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
         let session = LanguageModelSession(
-            instructions: "You extract nutrition facts from the raw OCR text of a food label. Report values per serving. Omit any field you cannot find."
+            instructions: "You extract nutrition facts from the raw OCR text of a food package. Report values per serving. The product name is packaging text near the top or side — never inside the Nutrition Facts panel — so read it from the surrounding lines. Omit any field you cannot find."
         )
         let prompt = "Nutrition label text:\n" + lines.joined(separator: "\n")
         do {
@@ -57,7 +57,7 @@ enum FoundationNutritionModel {
             let e = response.content
             return NutritionFacts(
                 name: e.name, servingDesc: e.servingDesc,
-                servingsPerContainer: e.servingsPerContainer,
+                servingPieces: e.servingPieces,
                 calories: e.calories, proteinG: e.proteinG,
                 carbsG: e.carbsG, fatG: e.fatG,
                 satFatG: e.satFatG, transFatG: e.transFatG,

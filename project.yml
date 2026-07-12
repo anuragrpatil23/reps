@@ -33,6 +33,7 @@ targets:
         CFBundleDisplayName: Reps
         NSHealthShareUsageDescription: Reps reads your weight, body composition, and activity from Apple Health to fill in your daily log.
         NSCameraUsageDescription: Reps uses the camera to take progress photos.
+        NSFaceIDUsageDescription: Reps uses Face ID to unlock your private progress photos.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.anurag.reps

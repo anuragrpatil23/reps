@@ -191,6 +191,41 @@ final class VaultStore {
         }
     }
 
+    // MARK: - Meal plans (daily food staples)
+
+    func readMealPlans() -> [MealPlan] {
+        withAccess { root in
+            let dir = root.appending(path: "sffit/meal-plans")
+            guard let files = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil) else { return [] }
+            return files
+                .filter { $0.pathExtension == "md" }
+                .compactMap { url in
+                    guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                    return DailyLogCodec.parseMealPlan(text)
+                }
+        } ?? []
+    }
+
+    func writeMealPlan(_ plan: MealPlan) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: "sffit/meal-plans/\(plan.key).md")
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let text = try DailyLogCodec.mealPlanMarkdown(for: plan)
+            try Data(text.utf8).write(to: url, options: .atomic)
+        }
+    }
+
+    func deleteMealPlan(key: String) throws {
+        _ = try withAccess { root in
+            let url = root.appending(path: "sffit/meal-plans/\(key).md")
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
     // MARK: - Progress pics
 
     /// Saves JPEG data and returns the vault-relative path for the log entry.

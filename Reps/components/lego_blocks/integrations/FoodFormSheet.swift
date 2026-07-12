@@ -14,14 +14,22 @@ struct FoodFormSheet: View {
     @State private var name = ""
     @State private var servingDesc = ""
     @State private var servingGrams: Double?
-    @State private var servingsPerContainer: Double?
+    @State private var servingPieces: Double?
     @State private var n = Macros()
 
     @State private var scanning = false
     @State private var showCamera = false
     @State private var showLibrary = false
     @State private var photoItem: PhotosPickerItem?
+    @State private var confirmDiscard = false
     @FocusState private var focus: String?
+
+    /// Anything worth not losing to an accidental swipe-dismiss.
+    private var hasContent: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+            || !servingDesc.isEmpty || servingGrams != nil || servingPieces != nil
+            || !n.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,14 +51,13 @@ struct FoodFormSheet: View {
                         }
                     }
                 } footer: {
-                    Text("Snap the Nutrition Facts panel; the fields below fill in for you to confirm.")
+                    Text("Include the product name and the Nutrition Facts panel in one shot; the fields below fill in for you to confirm.")
                 }
 
                 Section("Food") {
                     TextField("Name", text: $name).font(Typo.body)
-                    TextField("Serving (e.g. 1 cup / 170g)", text: $servingDesc).font(Typo.body)
                     optField("Serving weight", value: $servingGrams, unit: "g")
-                    optField("Servings / container", value: $servingsPerContainer, unit: "")
+                    optField("Pieces per serving", value: $servingPieces, unit: "")
                 }
 
                 Section("Per serving") {
@@ -86,7 +93,9 @@ struct FoodFormSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.foregroundStyle(Palette.graphite)
+                    Button("Cancel") {
+                        if hasContent { confirmDiscard = true } else { dismiss() }
+                    }.foregroundStyle(Palette.graphite)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
@@ -114,6 +123,12 @@ struct FoodFormSheet: View {
                 }
             }
             .onAppear { if let editing { populate(editing) } }
+            // Don't let a hard scroll swipe the sheet away and lose a scan.
+            .interactiveDismissDisabled(hasContent)
+            .confirmationDialog("Discard this food?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep editing", role: .cancel) {}
+            }
         }
     }
 
@@ -154,10 +169,10 @@ struct FoodFormSheet: View {
     private func scan(_ image: UIImage) async {
         scanning = true
         let facts = await NutritionExtractor.extract(from: image)
-        if let v = facts.name, !v.isEmpty, name.isEmpty { name = v }
+        if let v = facts.name, !v.isEmpty, name.isEmpty { name = Food.normalizedName(v) }
         if let v = facts.servingDesc, !v.isEmpty { servingDesc = v }
         if let v = facts.servingGrams { servingGrams = v }
-        if let v = facts.servingsPerContainer { servingsPerContainer = v }
+        if let v = facts.servingPieces { servingPieces = v }
         if let v = facts.calories { n.calories = v }
         if let v = facts.proteinG { n.proteinG = v }
         if let v = facts.carbsG { n.carbsG = v }
@@ -180,7 +195,7 @@ struct FoodFormSheet: View {
         name = food.name
         servingDesc = food.servingDesc
         servingGrams = food.servingGrams
-        servingsPerContainer = food.servingsPerContainer
+        servingPieces = food.servingPieces
         n = food.nutrition
     }
 
@@ -189,7 +204,7 @@ struct FoodFormSheet: View {
         let id = editing?.id ?? store.uniqueFoodId(for: trimmed)
         let food = Food(
             id: id, name: trimmed, servingDesc: servingDesc,
-            servingGrams: servingGrams, servingsPerContainer: servingsPerContainer,
+            servingGrams: servingGrams, servingPieces: servingPieces,
             nutrition: n, barcode: editing?.barcode, updatedAt: nil
         )
         store.saveFood(food)

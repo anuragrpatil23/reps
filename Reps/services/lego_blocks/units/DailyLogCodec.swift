@@ -199,6 +199,48 @@ enum DailyLogCodec {
         )
     }
 
+    // MARK: - Meal plans (daily food staples)
+
+    static func mealPlanMarkdown(for plan: MealPlan) throws -> String {
+        let fm: [String: Any] = [
+            "schema_version": schemaVersion,
+            "type": "sffit-meal-plan",
+            "key": plan.key,
+            "title": plan.title,
+            "phase": plan.phase.rawValue,
+            "staples": plan.staples.map(encodeFood),
+        ]
+        let yaml = try Yams.dump(object: fm, sortKeys: true)
+        return "---\n\(yaml)---\n"
+    }
+
+    static func parseMealPlan(_ text: String) -> MealPlan? {
+        guard let (fm, _) = splitFrontmatter(text),
+              fm["type"] as? String == "sffit-meal-plan",
+              let key = fm["key"] as? String else { return nil }
+        let staples = (fm["staples"] as? [[String: Any]])?.compactMap(decodeFood) ?? []
+        let phase = (fm["phase"] as? String).flatMap(TrainingPhase.init(rawValue:)) ?? .other
+        return MealPlan(key: key, title: fm["title"] as? String ?? key, phase: phase, staples: staples)
+    }
+
+    /// One food entry ⇄ YAML dict — shared by day logs and meal-plan staples.
+    static func encodeFood(_ entry: FoodEntry) -> [String: Any] {
+        var d: [String: Any] = ["at": entry.at]
+        if let v = entry.text { d["text"] = v }
+        if let v = entry.recipe { d["recipe"] = v }
+        if let v = entry.photo { d["photo"] = v }
+        if let v = entry.foodId { d["food_id"] = v }
+        if let v = entry.servings { d["servings"] = v }
+        return d
+    }
+
+    static func decodeFood(_ d: [String: Any]) -> FoodEntry? {
+        let at = d["at"] as? String ?? ""
+        return FoodEntry(at: at, text: d["text"] as? String, recipe: d["recipe"] as? String,
+                         photo: d["photo"] as? String, foodId: d["food_id"] as? String,
+                         servings: asDouble(d["servings"]))
+    }
+
     // MARK: - Shared plumbing
 
     private static func parseExercises(_ raw: Any?) -> [ExerciseEntry] {

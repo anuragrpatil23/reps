@@ -12,6 +12,7 @@ final class LogStore {
     private(set) var logsByDay: [Date: DailyLog] = [:]
     private(set) var templates: [WorkoutTemplate] = []
     private(set) var programs: [Program] = []
+    private(set) var mealPlans: [MealPlan] = []
     private(set) var foods: [Food] = []
     private(set) var loaded = false
     var lastError: String?
@@ -25,6 +26,17 @@ final class LogStore {
     var activeProgram: Program? {
         guard let key = activeProgramKey else { return nil }
         return programs.first { $0.key == key }
+    }
+
+    /// Key of the active meal plan (pre-fills each day's staples). Like the
+    /// program key, it's a UserDefaults preference, not vault data.
+    private static let activeMealPlanDefaultsKey = "reps.activeMealPlanKey"
+    var activeMealPlanKey: String? = UserDefaults.standard.string(forKey: activeMealPlanDefaultsKey) {
+        didSet { UserDefaults.standard.set(activeMealPlanKey, forKey: Self.activeMealPlanDefaultsKey) }
+    }
+    var activeMealPlan: MealPlan? {
+        guard let key = activeMealPlanKey else { return nil }
+        return mealPlans.first { $0.key == key }
     }
 
     /// Memoized food lookup — rebuilt only when `foods` changes, so it's not
@@ -79,6 +91,7 @@ final class LogStore {
         let fromVault = vault.readTemplates()
         templates = fromVault.isEmpty ? [.builtinPushA] : fromVault
         programs = vault.readPrograms()
+        mealPlans = vault.readMealPlans()
         foods = vault.readFoods()
         rebuildFoodIndex()
         loaded = true
@@ -189,6 +202,54 @@ final class LogStore {
         activeProgram?.isRestDay(date) ?? false
     }
 
+    // MARK: - Meal plans (daily food staples)
+
+    func uniqueMealPlanKey(for title: String) -> String {
+        uniqueKey(for: title) { key in mealPlans.contains { $0.key == key } }
+    }
+
+    func saveMealPlan(_ plan: MealPlan) {
+        if let index = mealPlans.firstIndex(where: { $0.key == plan.key }) {
+            mealPlans[index] = plan
+        } else {
+            mealPlans.append(plan)
+        }
+        if activeMealPlanKey == nil { activeMealPlanKey = plan.key }
+        do { try vault.writeMealPlan(plan) }
+        catch { lastError = "Couldn't save meal plan: \(error.localizedDescription)" }
+    }
+
+    func deleteMealPlan(_ key: String) {
+        mealPlans.removeAll { $0.key == key }
+        if activeMealPlanKey == key { activeMealPlanKey = mealPlans.first?.key }
+        do { try vault.deleteMealPlan(key: key) }
+        catch { lastError = "Couldn't delete meal plan: \(error.localizedDescription)" }
+    }
+
+    /// The active plan's staples not yet logged on `date`. A staple is "already
+    /// logged" when a matching food_id (or free text, for text-only staples) is
+    /// present in the day — so it drops off the planned list once you add it.
+    func plannedStaples(for date: Date) -> [FoodEntry] {
+        guard let plan = activeMealPlan else { return [] }
+        let logged = log(for: date)?.food ?? []
+        return plan.staples.filter { staple in
+            !logged.contains { existing in
+                if let id = staple.foodId { return existing.foodId == id }
+                return existing.text == staple.text
+            }
+        }
+    }
+
+    /// Log every not-yet-logged staple from the active plan onto `date` at once.
+    func logStaples(on date: Date) {
+        let staples = plannedStaples(for: date)
+        guard !staples.isEmpty else { return }
+        var log = editableLog(for: date)
+        log.food.append(contentsOf: staples)
+        log.food.sort { $0.at < $1.at }
+        writeDoc(log)
+    }
+
     // MARK: - Apple Watch sessions (workouts.csv, per day)
 
     /// Recorded Apple Watch workout sessions on `date` (functional strength,
@@ -196,6 +257,28 @@ final class LogStore {
     func workoutSessions(on date: Date) -> [WorkoutRecord] {
         let day = Calendar.current.startOfDay(for: date)
         return workouts.filter { $0.day == day }.sorted { $0.start > $1.start }
+    }
+
+    /// Minutes of strength vs. other movement on a day — drives the Spine's
+    /// stacked bar. Strength comes from recorded strength workouts (or a saved
+    /// strength log when the watch didn't record one); walking/cardio comes from
+    /// other recorded sessions, falling back to Apple's exercise minutes on days
+    /// with no discrete workout at all (a ring closed by casual movement).
+    func trainingSplit(on date: Date) -> (strength: Double, walk: Double) {
+        let sessions = workoutSessions(on: date)
+        let isStrength: (WorkoutRecord) -> Bool = { $0.type.lowercased().contains("strength") }
+        var strength = sessions.filter(isStrength).reduce(0) { $0 + $1.durationMin }
+        let walkSessions = sessions.filter { !isStrength($0) }.reduce(0) { $0 + $1.durationMin }
+
+        let day = log(for: date)
+        if strength == 0, let w = day?.workout, w.status == .done || w.status == .partial {
+            strength = Double(w.durationMin ?? 45)
+        }
+        var walk = walkSessions
+        if sessions.isEmpty && strength == 0 {
+            walk = Double(day?.activity?.exerciseMin ?? 0)
+        }
+        return (strength, walk)
     }
 
     /// The night's sleep for `date` (keyed to the wake-up day): asleep/in-bed

@@ -31,6 +31,10 @@ enum Palette {
     // Card stocks (v2): each domain gets its own quiet paper color.
     static let sage   = dynamic((227, 234, 224), (30, 40, 32))  // #E3EAE0 — activity
     static let butter = dynamic((245, 237, 218), (44, 40, 29))  // #F5EDDA — food
+    static let mist   = dynamic((228, 233, 237), (26, 32, 37))  // #E4E9ED — energy
+
+    /// Movement/walking on the Spine — a muted moss, legible against ink strength.
+    static let moss   = dynamic((94, 122, 104), (150, 184, 162)) // #5E7A68 / #96B8A2
 }
 
 /// A section card cut from its own paper stock.

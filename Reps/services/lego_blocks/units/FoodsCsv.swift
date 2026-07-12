@@ -14,7 +14,7 @@ enum FoodsCsv {
     /// Column order for the file we write. Read order comes from each file's own
     /// header row, so this can grow without breaking older files.
     private static let columns = [
-        "id", "name", "serving_desc", "serving_grams", "servings_per_container",
+        "id", "name", "serving_desc", "serving_grams", "serving_pieces",
         "calories", "protein_g", "carbs_g", "fat_g",
         "sat_fat_g", "trans_fat_g", "cholesterol_mg", "sodium_mg",
         "fiber_g", "total_sugars_g", "added_sugars_g",
@@ -38,7 +38,7 @@ enum FoodsCsv {
                 "name": food.name,
                 "serving_desc": food.servingDesc,
                 "serving_grams": food.servingGrams.map(num) ?? "",
-                "servings_per_container": food.servingsPerContainer.map(num) ?? "",
+                "serving_pieces": food.servingPieces.map(num) ?? "",
                 "calories": num(n.calories),
                 "protein_g": num(n.proteinG),
                 "carbs_g": num(n.carbsG),
@@ -94,7 +94,7 @@ enum FoodsCsv {
             return Food(
                 id: id, name: str("name"), servingDesc: str("serving_desc"),
                 servingGrams: optDbl("serving_grams"),
-                servingsPerContainer: optDbl("servings_per_container"),
+                servingPieces: optDbl("serving_pieces"),
                 nutrition: nutrition,
                 barcode: barcode.isEmpty ? nil : barcode,
                 updatedAt: updated.isEmpty ? nil : isoFormatter.date(from: updated)

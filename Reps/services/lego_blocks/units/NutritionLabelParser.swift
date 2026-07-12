@@ -8,7 +8,7 @@ import Foundation
 enum NutritionLabelParser {
     static func parse(_ lines: [String]) -> NutritionFacts {
         var facts = NutritionFacts()
-        facts.calories = number(near: ["calories", "calorie", "energy"], in: lines)
+        facts.calories = calories(in: lines)
         facts.proteinG = grams(near: ["protein"], in: lines)
         facts.carbsG = grams(near: ["total carbohydrate", "carbohydrate", "carbs", "carb"], in: lines)
         // "saturated" / "trans" before "fat" so the generic "fat" match doesn't eat them.
@@ -20,14 +20,98 @@ enum NutritionLabelParser {
         facts.totalSugarsG = grams(near: ["total sugars", "sugars", "sugar"], in: lines)
         facts.cholesterolMg = milligrams(near: ["cholesterol"], in: lines)
         facts.sodiumMg = milligrams(near: ["sodium"], in: lines)
-        facts.potassiumMg = milligrams(near: ["potassium"], in: lines)
+        facts.potassiumMg = milligrams(near: ["potassium", "potas"], in: lines)
         facts.calciumMg = milligrams(near: ["calcium"], in: lines)
         facts.ironMg = milligrams(near: ["iron"], in: lines)
-        facts.vitaminDMcg = micrograms(near: ["vitamin d", "vit d"], in: lines)
-        facts.servingsPerContainer = number(near: ["servings per container", "servings per"], in: lines)
+        facts.vitaminDMcg = micrograms(near: ["vitamin d", "vit d", "vit. d"], in: lines)
         facts.servingDesc = value(after: ["serving size", "serving"], in: lines)
         facts.servingGrams = facts.servingDesc.flatMap(gramWeight)
+        facts.servingPieces = pieceCount(from: facts.servingDesc)
+        facts.name = guessName(from: lines)
         return facts
+    }
+
+    /// Volume/weight units — a serving measured in these isn't a piece count.
+    private static let measuredUnits: Set<String> = [
+        "cup", "cups", "tbsp", "tbsps", "tablespoon", "tablespoons",
+        "tsp", "tsps", "teaspoon", "teaspoons", "oz", "ounce", "ounces",
+        "fl", "ml", "l", "liter", "liters", "litre", "litres",
+        "g", "gram", "grams", "kg", "mg", "mcg", "cc",
+    ]
+
+    /// Pieces in a serving from a description like "3 crackers (30g)" — a leading
+    /// count followed by a countable word (not a cup/gram/oz measure).
+    private static func pieceCount(from desc: String?) -> Double? {
+        guard let desc,
+              let regex = try? NSRegularExpression(pattern: #"^\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)"#),
+              let m = regex.firstMatch(in: desc, range: NSRange(desc.startIndex..., in: desc)),
+              let nRange = Range(m.range(at: 1), in: desc),
+              let uRange = Range(m.range(at: 2), in: desc),
+              let n = Double(desc[nRange]) else { return nil }
+        return measuredUnits.contains(desc[uRange].lowercased()) ? nil : n
+    }
+
+    /// Words that flag a line as part of the Nutrition Facts panel (or other
+    /// packaging boilerplate) rather than the product name.
+    private static let panelKeywords = [
+        "nutrition", "fact", "serving", "amount", "calorie", "daily value",
+        "per container", "total fat", "saturated", "trans", "cholesterol",
+        "sodium", "carbohydrate", "carb", "dietary", "fiber", "fibre", "sugar",
+        "protein", "vitamin", "calcium", "iron", "potassium", "includes",
+        "added", "ingredient", "contains", "allerg", "distributed",
+        "manufactured", "net wt", "net weight", "www", ".com", "%",
+    ]
+
+    /// Best-guess product name. Nutrition panels rarely label the product, so we
+    /// take the most name-like line: skip panel/boilerplate lines and number
+    /// rows, then take the first mostly-alphabetic line — with reading order now
+    /// top-to-bottom, that's usually the brand/product line above the facts.
+    static func guessName(from lines: [String]) -> String? {
+        for raw in lines {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard (3...40).contains(line.count) else { continue }
+
+            let lower = line.lowercased()
+            if panelKeywords.contains(where: lower.contains) { continue }
+
+            let letters = line.filter(\.isLetter).count
+            let digits = line.filter(\.isNumber).count
+            // Need real words and not a numbers/units row.
+            guard letters >= 3, letters > digits * 2 else { continue }
+
+            return line
+        }
+        return nil
+    }
+
+    /// Calories are the exception on a US panel: the big number usually lands on
+    /// the line *below* the word "Calories" (OCR splits them), so probe the
+    /// keyword line and, failing that, the next couple of lines for a standalone
+    /// number — but only a lone number, so we don't grab "Total Fat 8g" by mistake.
+    private static func calories(in lines: [String]) -> Double? {
+        for (i, line) in lines.enumerated() {
+            let lower = line.lowercased()
+            guard lower.contains("calorie") || lower.contains("energy") else { continue }
+            if lower.contains("from fat") { continue }   // old-label sub-line, not the headline
+            if let kcal = firstNumber(in: line, unit: "kcal") { return kcal }
+            if let n = firstNumber(in: line) { return n }
+            let upper = min(i + 2, lines.count - 1)
+            if upper >= i + 1 {
+                for j in (i + 1)...upper where isLoneNumber(lines[j]) {
+                    if let n = firstNumber(in: lines[j]) { return n }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// True when a line is nothing but a number (optionally with a "kcal" unit) —
+    /// i.e. the standalone calories value, not a "Total Fat 8g" nutrient row.
+    private static func isLoneNumber(_ s: String) -> Bool {
+        let stripped = s.lowercased()
+            .replacingOccurrences(of: "kcal", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        return !stripped.isEmpty && stripped.allSatisfy { $0.isNumber || $0 == "." }
     }
 
     /// First numeric value on a line mentioning any keyword.
