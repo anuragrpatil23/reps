@@ -27,12 +27,14 @@
 		D8338D84090FA4DC72EDD1F7 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */; };
 		E8EA3FFF6B33914EB4BAA748 /* TrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90C92C90BB3D96DDEF1F46A /* TrendsView.swift */; };
 		EACC05A1231D06A8FDDF2621 /* Trends.swift in Sources */ = {isa = PBXBuildFile; fileRef = F418752A8E29C447029115E4 /* Trends.swift */; };
+		F899DB10A2E871F09D4C2B88 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2E80CDB9D456BC120E341A4E /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		04D6E780C05F014506FF465B /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
 		1B4326BAC8023FA2D80E38EB /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		2695EEFFCE3210F482CF6AE8 /* WorkoutTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutTemplate.swift; sourceTree = "<group>"; };
+		2E80CDB9D456BC120E341A4E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		51F13DACEDABE9626B76AB42 /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStore.swift; sourceTree = "<group>"; };
 		5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
 		71D559EF44265DB8B63510DD /* FoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodEntrySheet.swift; sourceTree = "<group>"; };
@@ -123,6 +125,7 @@
 		F3102035D775E5E118A819E8 /* Reps */ = {
 			isa = PBXGroup;
 			children = (
+				2E80CDB9D456BC120E341A4E /* Assets.xcassets */,
 				89F73E9CB8B46A571B9DEA48 /* Info.plist */,
 				CD3F5EEFFE4D007B55AEC149 /* Reps.entitlements */,
 				808A4AF67562BF42CDE86016 /* RepsApp.swift */,
@@ -150,6 +153,7 @@
 			buildConfigurationList = 1A484B176691E754227BAF84 /* Build configuration list for PBXNativeTarget "Reps" */;
 			buildPhases = (
 				A3361D115BBEA5CE1060F5B2 /* Sources */,
+				CD6A8EC9013538B6F2596B29 /* Resources */,
 				A14EB5F286D4C13D24E52965 /* Frameworks */,
 			);
 			buildRules = (
@@ -199,6 +203,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CD6A8EC9013538B6F2596B29 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F899DB10A2E871F09D4C2B88 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A3361D115BBEA5CE1060F5B2 /* Sources */ = {
