@@ -5,6 +5,7 @@ import Charts
 /// training consistency, in the Ledger aesthetic.
 struct TrendsView: View {
     @Environment(LogStore.self) private var store
+    @State private var health = HealthTrends()
     @State private var range: TrendRange = .threeMonths
     @State private var selectedLift: String?
 
@@ -17,6 +18,7 @@ struct TrendsView: View {
                     title: "Weight", unit: "lbs",
                     points: ranged(store.metricSeries(.weight)), stock: Palette.chalk
                 )
+                CompositionChartCard(points: downsample(ranged(store.compositionSeries()), to: 12))
                 MetricChartCard(
                     title: "Body fat", unit: "%",
                     points: ranged(store.metricSeries(.bodyFat)), stock: Palette.sage
@@ -27,6 +29,7 @@ struct TrendsView: View {
                 )
                 strengthCard
                 trainingCard
+                healthSection
             }
             .padding(.horizontal, 24)
             .padding(.top, 24)
@@ -35,6 +38,27 @@ struct TrendsView: View {
         }
         .background(Palette.paper.ignoresSafeArea())
         .task { if !store.loaded { store.load() } }
+        .task(id: range) { await health.load(days: range.days) }
+    }
+
+    // MARK: Apple Health
+
+    private var healthSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("FROM APPLE HEALTH")
+                .font(Typo.eyebrow)
+                .tracking(2.2)
+                .foregroundStyle(Palette.graphite)
+                .padding(.top, 8)
+            MetricChartCard(title: "Steps", unit: "",
+                            points: ranged(health.steps), stock: Palette.sage)
+            MetricChartCard(title: "Active energy", unit: "kcal",
+                            points: ranged(health.activeEnergy), stock: Palette.sage)
+            MetricChartCard(title: "Exercise", unit: "min",
+                            points: ranged(health.exercise), stock: Palette.sage)
+            MetricChartCard(title: "Resting heart rate", unit: "bpm",
+                            points: ranged(health.restingHR), stock: Palette.chalk)
+        }
     }
 
     private var masthead: some View {
@@ -157,7 +181,7 @@ struct TrendsView: View {
 
     // MARK: helpers
 
-    private func ranged(_ points: [MetricPoint]) -> [MetricPoint] {
+    private func ranged<T: Dated>(_ points: [T]) -> [T] {
         guard let cutoff = Calendar.current.date(byAdding: .day, value: -range.days, to: .now)
         else { return points }
         return points.filter { $0.date >= cutoff }

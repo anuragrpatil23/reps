@@ -129,6 +129,32 @@ final class LogStore {
         }
     }
 
+    /// Weigh-ins split into fat-free (lean) + fat mass, oldest → newest.
+    /// Uses lean mass when present (fat = weight − lean), else derives both
+    /// from body-fat %. Skips weigh-ins with neither.
+    func compositionSeries() -> [CompositionPoint] {
+        sortedLogs.compactMap { log in
+            guard let m = log.metrics else { return nil }
+            let weight = m.weightLbs
+            var lean = m.leanMassLbs
+            var fat: Double?
+            if let lean { fat = Swift.max(weight - lean, 0) }
+            else if let bf = m.bodyFatPct {
+                let f = weight * bf / 100
+                fat = f
+                lean = weight - f
+            }
+            guard let fatValue = fat, let leanValue = lean else { return nil }
+            let bf = m.bodyFatPct ?? (weight > 0 ? fatValue / weight * 100 : 0)
+            return CompositionPoint(
+                date: log.date,
+                leanLbs: (leanValue * 10).rounded() / 10,
+                fatLbs: (fatValue * 10).rounded() / 10,
+                bodyFatPct: (bf * 10).rounded() / 10
+            )
+        }
+    }
+
     /// Trained-days count per ISO week, oldest → newest.
     func weeklyTrainingCounts(weeks: Int) -> [WeekBar] {
         let cal = Calendar.current
