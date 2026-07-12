@@ -7,31 +7,68 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		082A618B27AC77D811170E1F /* LogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D6E780C05F014506FF465B /* LogStore.swift */; };
 		0A42ABF4532925134350D9AB /* SpineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6AA62730248E37E26FA973D /* SpineView.swift */; };
-		1589BBCE7DA209DBAD3B98A6 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6C2DF17B8EFDD755D4694B /* MockData.swift */; };
+		280819F0CA5D32E130C30991 /* DailyLogCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8524FB2C383EB0CBA2AF336 /* DailyLogCodec.swift */; };
+		4EDEA3558D9A2DB9E33AF1C5 /* FoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D559EF44265DB8B63510DD /* FoodEntrySheet.swift */; };
 		5ADF576B803D3086CE870264 /* ActivityLineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD48382529EFD699B529389 /* ActivityLineView.swift */; };
 		5FCA33F82F725CB9EB5E1EFC /* WorkoutCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814D767C115D1D463103432C /* WorkoutCardView.swift */; };
 		61CF46E9CBE943A1440C4ED0 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B947F6AB014DBDF02CD02F /* TodayView.swift */; };
+		65FB1C7702EA97F27D29B9E4 /* WorkoutTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2695EEFFCE3210F482CF6AE8 /* WorkoutTemplate.swift */; };
 		8991AE595D261660F44D0E20 /* RepsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808A4AF67562BF42CDE86016 /* RepsApp.swift */; };
+		8FBE4B4948EC0E29541ADCB6 /* WorkoutEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B6F4E7CC7416D131AEFA34 /* WorkoutEditSheet.swift */; };
 		96E018236CB0950D7BBC1AA9 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15F45625B8B6BDC264E0889 /* Theme.swift */; };
+		A7C875AB1761C25D79CB0543 /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F13DACEDABE9626B76AB42 /* VaultStore.swift */; };
 		AD42C80E7C9B40903C65D7C7 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3218CB7500C92B6893783B6 /* DailyLog.swift */; };
+		BF702D63C7A54286CF954519 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 6D0A9FA6A13EDD0F299F8B4B /* Yams */; };
+		C408CE5F84DA300AE6E7BC7C /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4326BAC8023FA2D80E38EB /* SettingsSheet.swift */; };
+		D8338D84090FA4DC72EDD1F7 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		04D6E780C05F014506FF465B /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
+		1B4326BAC8023FA2D80E38EB /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
+		2695EEFFCE3210F482CF6AE8 /* WorkoutTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutTemplate.swift; sourceTree = "<group>"; };
+		51F13DACEDABE9626B76AB42 /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStore.swift; sourceTree = "<group>"; };
+		5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		71D559EF44265DB8B63510DD /* FoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodEntrySheet.swift; sourceTree = "<group>"; };
 		808A4AF67562BF42CDE86016 /* RepsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepsApp.swift; sourceTree = "<group>"; };
 		814D767C115D1D463103432C /* WorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutCardView.swift; sourceTree = "<group>"; };
 		89F73E9CB8B46A571B9DEA48 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8AD60C6BDD44A63047D0E969 /* Reps.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Reps.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9A6C2DF17B8EFDD755D4694B /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
 		A15F45625B8B6BDC264E0889 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A3218CB7500C92B6893783B6 /* DailyLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyLog.swift; sourceTree = "<group>"; };
 		C0B947F6AB014DBDF02CD02F /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		C3B6F4E7CC7416D131AEFA34 /* WorkoutEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutEditSheet.swift; sourceTree = "<group>"; };
 		C6AA62730248E37E26FA973D /* SpineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpineView.swift; sourceTree = "<group>"; };
+		C8524FB2C383EB0CBA2AF336 /* DailyLogCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyLogCodec.swift; sourceTree = "<group>"; };
 		CD3F5EEFFE4D007B55AEC149 /* Reps.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Reps.entitlements; sourceTree = "<group>"; };
 		CFD48382529EFD699B529389 /* ActivityLineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLineView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		A14EB5F286D4C13D24E52965 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF702D63C7A54286CF954519 /* Yams in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		222AA8450FE8B65CA1EE092E /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C8524FB2C383EB0CBA2AF336 /* DailyLogCodec.swift */,
+				5E8AA4D1FE8E26B80DF2846C /* HealthKitService.swift */,
+				04D6E780C05F014506FF465B /* LogStore.swift */,
+				51F13DACEDABE9626B76AB42 /* VaultStore.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		4945D4B84A170BD6F93331D5 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -44,7 +81,7 @@
 			isa = PBXGroup;
 			children = (
 				A3218CB7500C92B6893783B6 /* DailyLog.swift */,
-				9A6C2DF17B8EFDD755D4694B /* MockData.swift */,
+				2695EEFFCE3210F482CF6AE8 /* WorkoutTemplate.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -53,9 +90,12 @@
 			isa = PBXGroup;
 			children = (
 				CFD48382529EFD699B529389 /* ActivityLineView.swift */,
+				71D559EF44265DB8B63510DD /* FoodEntrySheet.swift */,
+				1B4326BAC8023FA2D80E38EB /* SettingsSheet.swift */,
 				C6AA62730248E37E26FA973D /* SpineView.swift */,
 				C0B947F6AB014DBDF02CD02F /* TodayView.swift */,
 				814D767C115D1D463103432C /* WorkoutCardView.swift */,
+				C3B6F4E7CC7416D131AEFA34 /* WorkoutEditSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -76,6 +116,7 @@
 				808A4AF67562BF42CDE86016 /* RepsApp.swift */,
 				FAD5B4B96FF3D5E00D913EA8 /* DesignSystem */,
 				5D2AA826BBC44B991346427B /* Models */,
+				222AA8450FE8B65CA1EE092E /* Services */,
 				6DAB53105EAC9473E0D3C296 /* Views */,
 			);
 			path = Reps;
@@ -97,6 +138,7 @@
 			buildConfigurationList = 1A484B176691E754227BAF84 /* Build configuration list for PBXNativeTarget "Reps" */;
 			buildPhases = (
 				A3361D115BBEA5CE1060F5B2 /* Sources */,
+				A14EB5F286D4C13D24E52965 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -104,6 +146,7 @@
 			);
 			name = Reps;
 			packageProductDependencies = (
+				6D0A9FA6A13EDD0F299F8B4B /* Yams */,
 			);
 			productName = Reps;
 			productReference = 8AD60C6BDD44A63047D0E969 /* Reps.app */;
@@ -132,6 +175,9 @@
 			);
 			mainGroup = 70274E239B152A2B56C3B912;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				92F7FC5D830EBF01E58F6E8A /* XCRemoteSwiftPackageReference "Yams" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4945D4B84A170BD6F93331D5 /* Products */;
 			projectDirPath = "";
@@ -149,12 +195,19 @@
 			files = (
 				5ADF576B803D3086CE870264 /* ActivityLineView.swift in Sources */,
 				AD42C80E7C9B40903C65D7C7 /* DailyLog.swift in Sources */,
-				1589BBCE7DA209DBAD3B98A6 /* MockData.swift in Sources */,
+				280819F0CA5D32E130C30991 /* DailyLogCodec.swift in Sources */,
+				4EDEA3558D9A2DB9E33AF1C5 /* FoodEntrySheet.swift in Sources */,
+				D8338D84090FA4DC72EDD1F7 /* HealthKitService.swift in Sources */,
+				082A618B27AC77D811170E1F /* LogStore.swift in Sources */,
 				8991AE595D261660F44D0E20 /* RepsApp.swift in Sources */,
+				C408CE5F84DA300AE6E7BC7C /* SettingsSheet.swift in Sources */,
 				0A42ABF4532925134350D9AB /* SpineView.swift in Sources */,
 				96E018236CB0950D7BBC1AA9 /* Theme.swift in Sources */,
 				61CF46E9CBE943A1440C4ED0 /* TodayView.swift in Sources */,
+				A7C875AB1761C25D79CB0543 /* VaultStore.swift in Sources */,
 				5FCA33F82F725CB9EB5E1EFC /* WorkoutCardView.swift in Sources */,
+				8FBE4B4948EC0E29541ADCB6 /* WorkoutEditSheet.swift in Sources */,
+				65FB1C7702EA97F27D29B9E4 /* WorkoutTemplate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,6 +397,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		92F7FC5D830EBF01E58F6E8A /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6D0A9FA6A13EDD0F299F8B4B /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 92F7FC5D830EBF01E58F6E8A /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DE75462DF504AF873BF6E8DE /* Project object */;
 }

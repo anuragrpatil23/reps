@@ -1,0 +1,204 @@
+import Foundation
+import Yams
+
+/// (De)serializes DailyLog / WorkoutTemplate to the markdown + YAML
+/// frontmatter shapes defined in docs/DATA-CONTRACT.md (schema v1).
+/// Key mapping is manual and explicit so the on-disk contract — snake_case,
+/// units in key names, omit-don't-null — never drifts with Swift naming.
+@MainActor
+enum DailyLogCodec {
+    static let schemaVersion = 1
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        f.timeZone = .current
+        return f
+    }()
+
+    static func dayString(_ date: Date) -> String { dayFormatter.string(from: date) }
+    static func day(from string: String) -> Date? { dayFormatter.date(from: string) }
+
+    // MARK: - Daily log → markdown
+
+    static func markdown(for log: DailyLog) throws -> String {
+        var fm: [String: Any] = [
+            "schema_version": schemaVersion,
+            "type": "sffit-daily-log",
+            "date": dayString(log.date),
+            "source": "reps-app",
+            "created_at": isoFormatter.string(from: log.createdAt ?? Date()),
+            "updated_at": isoFormatter.string(from: Date()),
+        ]
+        if let m = log.metrics {
+            var d: [String: Any] = ["weight_lbs": m.weightLbs]
+            if let v = m.bodyFatPct { d["body_fat_pct"] = v }
+            if let v = m.leanMassLbs { d["lean_mass_lbs"] = v }
+            if let v = m.measuredAt { d["measured_at"] = isoFormatter.string(from: v) }
+            fm["metrics"] = d
+        }
+        if let a = log.activity {
+            var d: [String: Any] = [
+                "move_kcal": a.moveKcal, "move_goal_kcal": a.moveGoalKcal,
+                "exercise_min": a.exerciseMin, "exercise_goal_min": a.exerciseGoalMin,
+                "stand_hours": a.standHours, "stand_goal_hours": a.standGoalHours,
+            ]
+            if let v = a.steps { d["steps"] = v }
+            fm["activity"] = d
+        }
+        if let w = log.workout {
+            var d: [String: Any] = ["status": w.status.rawValue]
+            if let v = w.template { d["template"] = v }
+            if let v = w.title { d["title"] = v }
+            if let v = w.startedAt { d["started_at"] = isoFormatter.string(from: v) }
+            if let v = w.durationMin { d["duration_min"] = v }
+            if !w.exercises.isEmpty { d["exercises"] = w.exercises.map(exerciseDict) }
+            fm["workout"] = d
+        }
+        if !log.food.isEmpty {
+            fm["food"] = log.food.map { entry -> [String: Any] in
+                var d: [String: Any] = ["at": entry.at]
+                if let v = entry.text { d["text"] = v }
+                if let v = entry.recipe { d["recipe"] = v }
+                if let v = entry.photo { d["photo"] = v }
+                return d
+            }
+        }
+        if !log.pics.isEmpty {
+            fm["pics"] = log.pics.map { ["path": $0.path, "pose": $0.pose.rawValue] }
+        }
+        let yaml = try Yams.dump(object: fm, sortKeys: true)
+        let body = log.note.map { "\n\($0)\n" } ?? ""
+        return "---\n\(yaml)---\n\(body)"
+    }
+
+    private static func exerciseDict(_ e: ExerciseEntry) -> [String: Any] {
+        var d: [String: Any] = ["name": e.name]
+        if let sets = e.sets {
+            d["sets"] = sets.map { ["reps": $0.reps, "weight_lbs": $0.weightLbs] }
+        }
+        if let v = e.durationMin { d["duration_min"] = v }
+        if let v = e.inclinePct { d["incline_pct"] = v }
+        if let v = e.speedMph { d["speed_mph"] = v }
+        return d
+    }
+
+    // MARK: - Markdown → daily log
+
+    static func parseDailyLog(_ text: String, date: Date) -> DailyLog? {
+        guard let (fm, body) = splitFrontmatter(text) else { return nil }
+        var log = DailyLog(date: date)
+        log.createdAt = (fm["created_at"] as? String).flatMap(isoFormatter.date)
+        if let m = fm["metrics"] as? [String: Any], let weight = asDouble(m["weight_lbs"]) {
+            log.metrics = BodyMetrics(
+                weightLbs: weight,
+                bodyFatPct: asDouble(m["body_fat_pct"]),
+                leanMassLbs: asDouble(m["lean_mass_lbs"]),
+                measuredAt: (m["measured_at"] as? String).flatMap(isoFormatter.date)
+            )
+        }
+        if let a = fm["activity"] as? [String: Any] {
+            log.activity = ActivitySummary(
+                moveKcal: asInt(a["move_kcal"]) ?? 0,
+                moveGoalKcal: asInt(a["move_goal_kcal"]) ?? 500,
+                exerciseMin: asInt(a["exercise_min"]) ?? 0,
+                exerciseGoalMin: asInt(a["exercise_goal_min"]) ?? 30,
+                standHours: asInt(a["stand_hours"]) ?? 0,
+                standGoalHours: asInt(a["stand_goal_hours"]) ?? 12,
+                steps: asInt(a["steps"])
+            )
+        }
+        if let w = fm["workout"] as? [String: Any],
+           let status = (w["status"] as? String).flatMap(WorkoutStatus.init(rawValue:)) {
+            log.workout = WorkoutEntry(
+                status: status,
+                template: w["template"] as? String,
+                title: w["title"] as? String,
+                startedAt: (w["started_at"] as? String).flatMap(isoFormatter.date),
+                durationMin: asInt(w["duration_min"]),
+                exercises: parseExercises(w["exercises"])
+            )
+        }
+        if let food = fm["food"] as? [[String: Any]] {
+            log.food = food.compactMap { d in
+                guard let at = d["at"] as? String else { return nil }
+                return FoodEntry(at: at, text: d["text"] as? String,
+                                 recipe: d["recipe"] as? String, photo: d["photo"] as? String)
+            }
+        }
+        if let pics = fm["pics"] as? [[String: Any]] {
+            log.pics = pics.compactMap { d in
+                guard let path = d["path"] as? String else { return nil }
+                let pose = (d["pose"] as? String).flatMap(PicPose.init(rawValue:)) ?? .other
+                return ProgressPic(path: path, pose: pose)
+            }
+        }
+        let note = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        log.note = note.isEmpty ? nil : note
+        return log
+    }
+
+    // MARK: - Templates
+
+    static func parseTemplate(_ text: String) -> WorkoutTemplate? {
+        guard let (fm, _) = splitFrontmatter(text),
+              fm["type"] as? String == "sffit-workout-template",
+              let key = fm["key"] as? String else { return nil }
+        return WorkoutTemplate(
+            key: key,
+            title: fm["title"] as? String ?? key,
+            exercises: parseExercises(fm["exercises"])
+        )
+    }
+
+    // MARK: - Shared plumbing
+
+    private static func parseExercises(_ raw: Any?) -> [ExerciseEntry] {
+        guard let list = raw as? [[String: Any]] else { return [] }
+        return list.compactMap { d in
+            guard let name = d["name"] as? String else { return nil }
+            var sets: [SetEntry]?
+            if let rawSets = d["sets"] as? [[String: Any]] {
+                sets = rawSets.compactMap { s in
+                    guard let reps = asInt(s["reps"]), let weight = asDouble(s["weight_lbs"]) else { return nil }
+                    return SetEntry(reps: reps, weightLbs: weight)
+                }
+            }
+            return ExerciseEntry(
+                name: name, sets: sets,
+                durationMin: asInt(d["duration_min"]),
+                inclinePct: asDouble(d["incline_pct"]),
+                speedMph: asDouble(d["speed_mph"])
+            )
+        }
+    }
+
+    private static func splitFrontmatter(_ text: String) -> ([String: Any], String)? {
+        guard text.hasPrefix("---") else { return nil }
+        let afterOpen = text.index(text.startIndex, offsetBy: 3)
+        guard let close = text.range(of: "\n---", range: afterOpen..<text.endIndex) else { return nil }
+        let yaml = String(text[afterOpen..<close.lowerBound])
+        let body = String(text[close.upperBound...]).drop { $0 == "-" }
+        guard let fm = (try? Yams.load(yaml: yaml)) as? [String: Any] else { return nil }
+        return (fm, String(body))
+    }
+
+    private static func asDouble(_ value: Any?) -> Double? {
+        if let d = value as? Double { return d }
+        if let i = value as? Int { return Double(i) }
+        return nil
+    }
+
+    private static func asInt(_ value: Any?) -> Int? {
+        if let i = value as? Int { return i }
+        if let d = value as? Double { return Int(d) }
+        return nil
+    }
+}

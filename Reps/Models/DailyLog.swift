@@ -6,6 +6,7 @@ import Foundation
 
 struct DailyLog: Identifiable, Codable, Sendable {
     var date: Date
+    var createdAt: Date?
     var metrics: BodyMetrics?
     var activity: ActivitySummary?
     var workout: WorkoutEntry?

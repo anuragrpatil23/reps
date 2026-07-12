@@ -10,12 +10,18 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     TARGETED_DEVICE_FAMILY: "1"
     INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+packages:
+  Yams:
+    url: https://github.com/jpsim/Yams.git
+    from: 5.1.0
 targets:
   Reps:
     type: application
     platform: iOS
     sources:
       - Reps
+    dependencies:
+      - package: Yams
     entitlements:
       path: Reps/Reps.entitlements
       properties:
