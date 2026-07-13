@@ -20,6 +20,7 @@ struct FoodFormSheet: View {
     @State private var scanning = false
     @State private var showCamera = false
     @State private var showLibrary = false
+    @State private var showSearch = false
     @State private var photoItem: PhotosPickerItem?
     @State private var confirmDiscard = false
     @FocusState private var focus: String?
@@ -44,6 +45,10 @@ struct FoodFormSheet: View {
                         Label("Scan nutrition label", systemImage: "text.viewfinder")
                             .foregroundStyle(Palette.madder)
                     }
+                    Button { showSearch = true } label: {
+                        Label("Search online", systemImage: "magnifyingglass")
+                            .foregroundStyle(Palette.madder)
+                    }
                     if scanning {
                         HStack(spacing: 8) {
                             ProgressView()
@@ -51,7 +56,7 @@ struct FoodFormSheet: View {
                         }
                     }
                 } footer: {
-                    Text("Include the product name and the Nutrition Facts panel in one shot; the fields below fill in for you to confirm.")
+                    Text("Scan a label, or search a food database for approximate numbers when you don't have one. Either way the fields below fill in for you to confirm.")
                 }
 
                 Section("Food") {
@@ -111,6 +116,11 @@ struct FoodFormSheet: View {
             .fullScreenCover(isPresented: $showCamera) {
                 CameraCapture { image in Task { await scan(image) } }.ignoresSafeArea()
             }
+            .sheet(isPresented: $showSearch) {
+                FoodSearchSheet(initialQuery: name) { result in
+                    apply(result.facts, overwriteName: true)
+                }
+            }
             .photosPicker(isPresented: $showLibrary, selection: $photoItem, matching: .images)
             .onChange(of: photoItem) {
                 guard let photoItem else { return }
@@ -169,7 +179,18 @@ struct FoodFormSheet: View {
     private func scan(_ image: UIImage) async {
         scanning = true
         let facts = await NutritionExtractor.extract(from: image)
-        if let v = facts.name, !v.isEmpty, name.isEmpty { name = Food.normalizedName(v) }
+        // Scanning augments what's typed — don't clobber a name already entered.
+        apply(facts, overwriteName: false)
+        scanning = false
+    }
+
+    /// Prefill the form from structured facts (label scan or online lookup).
+    /// A missing field is left as-is so no single gap zeroes a good entry;
+    /// `overwriteName` is set when the user explicitly chose this item.
+    private func apply(_ facts: NutritionFacts, overwriteName: Bool) {
+        if let v = facts.name, !v.isEmpty, overwriteName || name.isEmpty {
+            name = Food.normalizedName(v)
+        }
         if let v = facts.servingDesc, !v.isEmpty { servingDesc = v }
         if let v = facts.servingGrams { servingGrams = v }
         if let v = facts.servingPieces { servingPieces = v }
@@ -188,7 +209,6 @@ struct FoodFormSheet: View {
         if let v = facts.calciumMg { n.calciumMg = v }
         if let v = facts.ironMg { n.ironMg = v }
         if let v = facts.potassiumMg { n.potassiumMg = v }
-        scanning = false
     }
 
     private func populate(_ food: Food) {
