@@ -314,7 +314,7 @@ struct TodayView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .center) {
                     sectionHeader("Workout")
                     Spacer()
                     Menu {
@@ -327,9 +327,11 @@ struct TodayView: View {
                             Label("Mark as rest day", systemImage: "moon.zzz")
                         }
                     } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Palette.madder)
+                        addGlyph
+                    } primaryAction: {
+                        // Tap = add exercise instantly (no Menu presentation lag);
+                        // long-press still opens the menu for the rest-day option.
+                        addingWorkoutExercise = true
                     }
                     .accessibilityLabel("Add exercise or mark rest")
                 }
@@ -452,15 +454,13 @@ struct TodayView: View {
 
     private var foodSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center) {
                 sectionHeader("Food")
                 Spacer()
                 Button {
                     showingFoodSheet = true
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Palette.madder)
+                    addGlyph
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Add food")
@@ -781,6 +781,17 @@ struct TodayView: View {
             .font(Typo.display)
             .foregroundStyle(Palette.ink)
             .padding(.bottom, 6)
+    }
+
+    /// The card's add affordance: a madder plus on a faint madder disc. A full
+    /// circular target is easier to tap than a bare glyph.
+    private var addGlyph: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Palette.madder)
+            .frame(width: 30, height: 30)
+            .background(Circle().fill(Palette.madder.opacity(0.08)))
+            .overlay(Circle().stroke(Palette.madder.opacity(0.20), lineWidth: 1))
     }
 
     private func emptyLine(_ text: String) -> some View {
